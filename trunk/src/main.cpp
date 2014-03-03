@@ -9,8 +9,8 @@
 //       Revision:  none
 //       Compiler:  g++
 //
-//         Author:  Zhu Zilong (), zhuzilong@baidu.com
-//        Company:  baidu.com.houyi
+//         Author:  Zilong.Zhu (), zilong.whu@gmail.com
+//        Company:  edu.whu
 //
 // =====================================================================================
 
@@ -18,6 +18,8 @@
 
 int main(int argc, char *argv[])
 {
-    MemoryPool mp;
+    DelayPool::init_time_updater();
+
+    DelayPool mp;
     return 0;
 }
