@@ -200,6 +200,16 @@ class DelayPool
             }
         }
 
+        void *alloc()
+        {
+            return m_pool.alloc();
+        }
+
+        void free(void *ptr)
+        {
+            m_pool.free(ptr);
+        }
+
         int delay_free(void *ptr)
         {
             if (NULL == ptr)
