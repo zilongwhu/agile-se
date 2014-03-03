@@ -17,7 +17,7 @@
 #ifndef __AGILE_SE_MEMORY_POOL_H__
 #define __AGILE_SE_MEMORY_POOL_H__
 
-#include <deque>
+#include <stdlib.h>
 
 class MemoryPool
 {
@@ -34,6 +34,7 @@ class MemoryPool
         {
             this->clear();
         }
+
         ~MemoryPool()
         {
             this->destroy();
@@ -89,6 +90,7 @@ class MemoryPool
             }
             return this->alloc();
         }
+
         void free(void *ptr)
         {
             if (NULL == ptr)
@@ -101,24 +103,13 @@ class MemoryPool
             --m_alloc_num;
             ++m_free_num;
         }
-        void delay_free(void *ptr)
-        {
-            if (NULL == ptr)
-            {
-                return ;
-            }
-            m_delayed_list.push_back(ptr);
-            ++m_delayed_num;
-        }
-        void recycle()
-        {
-            while (m_delayed_list.size() > 0)
-            {
-                this->free(m_delayed_list.front());
-                m_delayed_list.pop_front();
-                --m_delayed_num;
-            }
-        }
+
+        size_t cur_blocks_num() const { return m_cur_blocks_num; }
+        size_t max_blocks_num() const { return m_max_blocks_num; }
+        size_t block_size() const { return m_block_size; }
+        size_t elem_size() const { return m_elem_size; }
+        size_t alloc_num() const { return m_alloc_num; }
+        size_t free_num() const { return m_free_num; }
     private:
         void clear()
         {
@@ -129,10 +120,9 @@ class MemoryPool
             m_elem_size = 0;
             m_alloc_num = 0;
             m_free_num = 0;
-            m_delayed_num = 0;
             m_free_list = NULL;
-            m_delayed_list.clear();
         }
+
         void destroy()
         {
             if (m_blocks)
@@ -154,10 +144,131 @@ class MemoryPool
 
         size_t m_alloc_num;
         size_t m_free_num;
-        size_t m_delayed_num;
 
         element_t *m_free_list;
-        std::deque<void *> m_delayed_list;
+};
+
+class DelayPool
+{
+    private:
+        struct node_t
+        {
+            void *ptr;
+            int push_time;
+        };
+        struct queue_t
+        {
+            MemoryPool::element_t *head;
+            MemoryPool::element_t *tail;
+        };
+    public:
+        DelayPool()
+        {
+            m_delayed_num = 0;
+            m_delayed_time = 5;
+            m_delayed_list.head = m_delayed_list.tail = NULL;
+        }
+
+        ~DelayPool()
+        {
+            m_delayed_num = 0;
+            m_delayed_time = 5;
+            m_delayed_list.head = m_delayed_list.tail = NULL;
+        }
+
+        int init(size_t elem_size, size_t block_size, size_t pool_size)
+        {
+            int ret = m_pool.init(elem_size, block_size, pool_size);
+            if (ret < 0)
+            {
+                return ret;
+            }
+            int total = m_pool.block_size() / m_pool.elem_size() * m_pool.max_blocks_num();
+            ret = m_list_pool.init(sizeof(node_t), 1024*1024, total * (sizeof(void *) + sizeof(node_t)));
+            if (ret < 0)
+            {
+                return ret;
+            }
+            return 0;
+        }
+
+        void set_delayed_time(int delayed_seconds)
+        {
+            if (delayed_seconds > 0)
+            {
+                m_delayed_time = delayed_seconds;
+            }
+        }
+
+        int delay_free(void *ptr)
+        {
+            if (NULL == ptr)
+            {
+                return -1;
+            }
+            MemoryPool::element_t *elem = (MemoryPool::element_t *)m_list_pool.alloc();
+            if (NULL == elem)
+            {
+                return -2;
+            }
+            elem->next = NULL;
+            node_t *node = (node_t *)(elem + 1);
+            node->ptr = ptr;
+            node->push_time = s_now;
+            if (m_delayed_list.tail)
+            {
+                m_delayed_list.tail->next = elem;
+                m_delayed_list.tail = elem;
+            }
+            else
+            {
+                m_delayed_list.head = m_delayed_list.tail = elem;
+            }
+            ++m_delayed_num;
+            return 0;
+        }
+
+        void recycle()
+        {
+            const int now = s_now;
+            node_t *node;
+            MemoryPool::element_t *head;
+            while (m_delayed_list.head)
+            {
+                head = m_delayed_list.head;
+                node = (node_t *)(head + 1);
+                if (node->push_time + m_delayed_time >= now)
+                {
+                    break;
+                }
+                m_pool.free(node->ptr);
+                m_delayed_list.head = head->next;
+                if (NULL == m_delayed_list.head)
+                {
+                    m_delayed_list.tail = NULL;
+                }
+                m_list_pool.free(head);
+                --m_delayed_num;
+            }
+        }
+
+        size_t delayed_num() const { return m_delayed_num; }
+    private:
+        MemoryPool m_pool;
+        MemoryPool m_list_pool;
+
+        size_t m_delayed_num;
+        int m_delayed_time;
+
+        queue_t m_delayed_list;
+    public:
+        static void init_time_updater();
+        static int now()
+        {
+            return s_now;
+        }
+    private:
+        static int s_now;
 };
 
 #endif
