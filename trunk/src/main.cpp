@@ -32,5 +32,12 @@ int main(int argc, char *argv[])
     ObjectPool<int> ip;
     ObjectPool<float> fp;
     ObjectPool<A> ap;
+
+    ap.init(4096, 1024*1024*1024);
+    A *ptr = ap.alloc();
+    ap.free(ptr);
+    ptr = ap.alloc();
+    ap.delay_free(ptr);
+    ap.recycle();
     return 0;
 }
