@@ -111,6 +111,12 @@ class MemoryPool
         size_t elem_size() const { return m_elem_size; }
         size_t alloc_num() const { return m_alloc_num; }
         size_t free_num() const { return m_free_num; }
+
+        size_t mem() const
+        {
+            return sizeof(void *) * m_max_blocks_num
+                + m_cur_blocks_num * m_block_size;
+        }
     private:
         void clear()
         {
@@ -269,7 +275,18 @@ class DelayPool
             }
         }
 
+        size_t cur_blocks_num() const { return m_pool.cur_blocks_num(); }
+        size_t max_blocks_num() const { return m_pool.max_blocks_num(); }
+        size_t block_size() const { return m_pool.block_size(); }
+        size_t elem_size() const { return m_pool.elem_size(); }
+        size_t alloc_num() const { return m_pool.alloc_num(); }
+        size_t free_num() const { return m_pool.free_num(); }
         size_t delayed_num() const { return m_delayed_num; }
+
+        size_t mem() const
+        {
+            return m_pool.mem() + m_list_pool.mem();
+        }
     private:
         MemoryPool m_pool;
         MemoryPool m_list_pool;
@@ -362,6 +379,19 @@ class ObjectPool
             m_pool.recycle(destroy, NULL);
         }
 
+        void set_delayed_time(int delayed_seconds)
+        {
+            m_pool.set_delayed_time(delayed_seconds);
+        }
+        size_t cur_blocks_num() const { return m_pool.cur_blocks_num(); }
+        size_t max_blocks_num() const { return m_pool.max_blocks_num(); }
+        size_t block_size() const { return m_pool.block_size(); }
+        size_t elem_size() const { return m_pool.elem_size(); }
+        size_t alloc_num() const { return m_pool.alloc_num(); }
+        size_t free_num() const { return m_pool.free_num(); }
+        size_t delayed_num() const { return m_pool.delayed_num(); }
+        size_t mem() const { return m_pool.mem(); }
+    private:
         static void destroy(void *ptr, void *arg)
         {
             if (ptr)

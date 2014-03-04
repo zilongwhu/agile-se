@@ -14,6 +14,7 @@
 //
 // =====================================================================================
 
+#include <iostream>
 #include "pool/mempool.h"
 
 struct A
@@ -55,7 +56,7 @@ int main(int argc, char *argv[])
     ObjectPool<float> fp;
     ObjectPool<A> ap;
 
-    ap.init(4096, 1024*1024*1024);
+    ap.init(1024*1024, 20l*1024*1024*1024);
     A *ptr = ap.alloc();
     ap.free(ptr);
     ptr = ap.alloc();
@@ -65,5 +66,25 @@ int main(int argc, char *argv[])
     ap.alloc<int, int>(1, 2);
     ap.alloc<int, int, int>(1, 2, 3);
     ap.alloc<int, long, short>(1, 2, 3);
+
+    std::cout << ap.max_blocks_num() << std::endl;
+    std::cout << ap.cur_blocks_num() << std::endl;
+    std::cout << ap.block_size() << std::endl;
+    std::cout << ap.elem_size() << std::endl;
+    std::cout << ap.alloc_num() << std::endl;
+    std::cout << ap.free_num() << std::endl;
+    std::cout << ap.delayed_num() << std::endl;
+
+    std::cout << std::endl;
+    for (int i = 0; i < 6; ++i)
+    {
+        sleep(1);
+        ap.recycle();
+        std::cout << DelayPool::now() << std::endl;
+        std::cout << ap.free_num() << std::endl;
+        std::cout << ap.delayed_num() << std::endl;
+    }
+    
+    std::cout << ap.mem() << std::endl;
     return 0;
 }
