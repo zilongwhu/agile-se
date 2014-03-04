@@ -21,6 +21,28 @@ struct A
     int a;
     int b;
     int c;
+
+    A()
+    {
+        a = b = c = 0;
+    }
+    A(int aa)
+    {
+        a = aa;
+        b = c = 0;
+    }
+    A(int aa, int bb)
+    {
+        a = aa;
+        b = bb;
+        c = 0;
+    }
+    A(int aa, int bb, int cc)
+    {
+        a = aa;
+        b = bb;
+        c = cc;
+    }
 };
 
 int main(int argc, char *argv[])
@@ -39,5 +61,9 @@ int main(int argc, char *argv[])
     ptr = ap.alloc();
     ap.delay_free(ptr);
     ap.recycle();
+    ap.alloc<int>(1);
+    ap.alloc<int, int>(1, 2);
+    ap.alloc<int, int, int>(1, 2, 3);
+    ap.alloc<int, long, short>(1, 2, 3);
     return 0;
 }

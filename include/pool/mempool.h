@@ -310,6 +310,39 @@ class ObjectPool
             return ptr;
         }
 
+        template<typename Arg1>
+            T *alloc(Arg1 arg1)
+            {
+                T *ptr = (T *)m_pool.alloc();
+                if (ptr)
+                {
+                    new (ptr) T(arg1);
+                }
+                return ptr;
+            }
+
+        template<typename Arg1, typename Arg2>
+            T *alloc(Arg1 arg1, Arg2 arg2)
+            {
+                T *ptr = (T *)m_pool.alloc();
+                if (ptr)
+                {
+                    new (ptr) T(arg1, arg2);
+                }
+                return ptr;
+            }
+
+        template<typename Arg1, typename Arg2, typename Arg3>
+            T *alloc(Arg1 arg1, Arg2 arg2, Arg3 arg3)
+            {
+                T *ptr = (T *)m_pool.alloc();
+                if (ptr)
+                {
+                    new (ptr) T(arg1, arg2, arg3);
+                }
+                return ptr;
+            }
+
         void free(T *ptr)
         {
             if (ptr)
