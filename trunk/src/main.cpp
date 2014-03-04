@@ -17,6 +17,7 @@
 #include <iostream>
 #include "mempool.h"
 #include "sortlist.h"
+#include "idlist.h"
 
 struct A
 {
@@ -118,5 +119,7 @@ int main(int argc, char *argv[])
         std::cout << it->a << std::endl;
         ++it;
     }
+
+    IDList ids(NULL, 0);
     return 0;
 }
