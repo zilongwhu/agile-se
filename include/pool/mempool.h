@@ -18,6 +18,7 @@
 #define __AGILE_SE_MEMORY_POOL_H__
 
 #include <stdlib.h>
+#include <new>
 
 class MemoryPool
 {
