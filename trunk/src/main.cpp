@@ -16,10 +16,21 @@
 
 #include "pool/mempool.h"
 
+struct A
+{
+    int a;
+    int b;
+    int c;
+};
+
 int main(int argc, char *argv[])
 {
     DelayPool::init_time_updater();
 
     DelayPool mp;
+
+    ObjectPool<int> ip;
+    ObjectPool<float> fp;
+    ObjectPool<A> ap;
     return 0;
 }
