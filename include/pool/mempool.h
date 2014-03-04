@@ -150,6 +150,8 @@ class MemoryPool
 
 class DelayPool
 {
+    public:
+        typedef void (*destroy_fun_t)(void *ptr, void *arg);
     private:
         struct node_t
         {
@@ -238,7 +240,7 @@ class DelayPool
             return 0;
         }
 
-        void recycle()
+        void recycle(destroy_fun_t fun = NULL, void *arg = NULL)
         {
             const int now = s_now;
             node_t *node;
@@ -250,6 +252,10 @@ class DelayPool
                 if (node->push_time + m_delayed_time >= now)
                 {
                     break;
+                }
+                if (fun)
+                {
+                    fun(node->ptr, arg);
                 }
                 m_pool.free(node->ptr);
                 m_delayed_list.head = head->next;
