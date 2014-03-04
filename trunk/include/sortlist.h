@@ -18,7 +18,7 @@
 #define __AGILE_SE_SORTLIST_H__
 
 #include <utility>
-#include "pool/mempool.h"
+#include "mempool.h"
 
 template<typename T>
 class SortList

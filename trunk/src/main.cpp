@@ -15,8 +15,8 @@
 // =====================================================================================
 
 #include <iostream>
-#include "pool/mempool.h"
-#include "pool/sortlist.h"
+#include "mempool.h"
+#include "sortlist.h"
 
 struct A
 {
