@@ -16,6 +16,7 @@
 
 #include <iostream>
 #include "pool/mempool.h"
+#include "pool/sortlist.h"
 
 struct A
 {
@@ -43,6 +44,16 @@ struct A
         a = aa;
         b = bb;
         c = cc;
+    }
+
+    bool operator <(const A &o) const
+    {
+        return a < o.a;
+    }
+
+    bool operator ==(const A &o) const
+    {
+        return a == o.a;
     }
 };
 
@@ -86,5 +97,26 @@ int main(int argc, char *argv[])
     }
     
     std::cout << ap.mem() << std::endl;
+
+    ObjectPool<SortList<A>::node_t> anp;
+    anp.init(4096, 1024*1024*1024);
+    SortList<A> list(&anp);
+
+    list.insert(A(5));
+    list.insert(A(3));
+    list.insert(A(1));
+    list.insert(A(2));
+    list.insert(A(4));
+
+    list.remove(A(3));
+
+    std::cout << "===" << std::endl;
+
+    SortList<A>::iterator it = list.begin();
+    while (it != list.end())
+    {
+        std::cout << it->a << std::endl;
+        ++it;
+    }
     return 0;
 }
