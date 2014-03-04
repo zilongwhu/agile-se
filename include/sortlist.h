@@ -156,7 +156,7 @@ class SortList
 
         void recycle()
         {
-            m_pool.recycle();
+            m_pool->recycle();
         }
 
         T *find(const T &v) const
