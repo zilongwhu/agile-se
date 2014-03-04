@@ -36,6 +36,8 @@ static void *pool_timer_thread(void *ptr)
 
 void DelayPool::init_time_updater()
 {
+    s_now = ::time(NULL);
+
     pthread_t pid;
     int ret = ::pthread_create(&pid, NULL, pool_timer_thread, &s_now);
     if (ret != 0)
