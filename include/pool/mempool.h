@@ -287,4 +287,57 @@ class DelayPool
         static int s_now;
 };
 
+template<typename T>
+class ObjectPool
+{
+    public:
+        ObjectPool() { }
+        ~ObjectPool() { }
+
+        int init(size_t block_size, size_t pool_size)
+        {
+            return m_pool.init(sizeof(T), block_size, pool_size);
+        }
+
+        T *alloc()
+        {
+            T *ptr = (T *)m_pool.alloc();
+            if (ptr)
+            {
+                new (ptr) T();
+            }
+            return ptr;
+        }
+
+        void free(T *ptr)
+        {
+            if (ptr)
+            {
+                ptr->~T();
+                m_pool.free(ptr);
+            }
+        }
+
+        int delay_free(T *ptr)
+        {
+            return m_pool.delay_free(ptr);
+        }
+
+        void recycle()
+        {
+            m_pool.recycle(destroy, NULL);
+        }
+
+        static void destroy(void *ptr, void *arg)
+        {
+            if (ptr)
+            {
+                T *p = (T *)ptr;
+                p->~T();
+            }
+        }
+    private:
+        DelayPool m_pool;
+};
+
 #endif
