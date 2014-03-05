@@ -19,6 +19,7 @@
 #include "sortlist.h"
 #include "idlist.h"
 #include "hashtable.h"
+#include "forward_index.h"
 
 struct A
 {
@@ -155,5 +156,7 @@ int main(int argc, char *argv[])
         std::cout << np.free_num() << std::endl;
         std::cout << np.delayed_num() << std::endl;
     }
+
+    ForwardIndex idx;
     return 0;
 }
