@@ -302,7 +302,7 @@ class DelayPool
             return s_now;
         }
     private:
-        static int s_now;
+        static volatile int s_now;
 };
 
 template<typename T>
