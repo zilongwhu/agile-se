@@ -48,27 +48,35 @@ class HashTable
                 }
             }
             m_bucket_size = bucket_size;
+            m_size = 0;
         }
         ~HashTable()
         {
             if (m_buckets)
             {
-                node_t *cur;
-                for (size_t i = 0; i < m_bucket_size; ++i)
+                if (m_size > 0)
                 {
-                    while (m_buckets[i])
+                    node_t *cur;
+                    for (size_t i = 0; i < m_bucket_size; ++i)
                     {
-                        cur = m_buckets[i];
-                        m_buckets[i] = cur->next;
-                        m_pool->delay_free(cur);
+                        while (m_buckets[i])
+                        {
+                            cur = m_buckets[i];
+                            m_buckets[i] = cur->next;
+                            m_pool->delay_free(cur);
+                        }
                     }
                 }
                 delete [] m_buckets;
                 m_buckets = NULL;
             }
             m_bucket_size = 0;
+            m_size = 0;
             m_pool = NULL;
         }
+
+        size_t bucket_size() const { return m_bucket_size; }
+        size_t size() const { return m_size; }
 
         bool get(const Key &key, Value **pv = NULL) const
         {
@@ -116,6 +124,7 @@ class HashTable
             }
             cur->next = m_buckets[off];
             m_buckets[off] = cur;
+            ++m_size;
 RET_TRUE:
             if (pv)
             {
@@ -141,6 +150,7 @@ RET_TRUE:
             {
                 *pv = &cur->value;
             }
+            ++m_size;
             return true;
         }
         bool remove(const Key &key, Value *pv = NULL)
@@ -169,6 +179,7 @@ RET_TRUE:
                         *pv = cur->value;
                     }
                     m_pool->delay_free(cur);
+                    --m_size;
                     return true;
                 }
                 pre = cur;
@@ -181,6 +192,7 @@ RET_TRUE:
 
         node_t **m_buckets;
         size_t m_bucket_size;
+        size_t m_size;
 
         HashFun m_hash;
         EqualFun m_equal;
