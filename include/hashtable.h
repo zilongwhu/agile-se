@@ -53,10 +53,21 @@ class HashTable
         {
             if (m_buckets)
             {
+                node_t *cur;
+                for (size_t i = 0; i < m_bucket_size; ++i)
+                {
+                    while (m_buckets[i])
+                    {
+                        cur = m_buckets[i];
+                        m_buckets[i] = cur->next;
+                        m_pool->delay_free(cur);
+                    }
+                }
                 delete [] m_buckets;
                 m_buckets = NULL;
             }
             m_bucket_size = 0;
+            m_pool = NULL;
         }
 
         bool get(const Key &key, Value **pv = NULL) const
@@ -81,7 +92,7 @@ class HashTable
             }
             return false;
         }
-        bool set(const Key &key, const Value &v)
+        bool set(const Key &key, const Value &v, Value **pv = NULL)
         {
             if (NULL == m_buckets)
             {
@@ -94,7 +105,7 @@ class HashTable
                 if (m_equal(key, cur->key))
                 {
                     cur->value = v;
-                    return true;
+                    goto RET_TRUE;
                 }
                 cur = cur->next;
             }
@@ -105,6 +116,31 @@ class HashTable
             }
             cur->next = m_buckets[off];
             m_buckets[off] = cur;
+RET_TRUE:
+            if (pv)
+            {
+                *pv = &cur->value;
+            }
+            return true;
+        }
+        bool unchecked_insert(const Key &key, const Value &v, Value **pv = NULL)
+        {
+            if (NULL == m_buckets)
+            {
+                return false;
+            }
+            size_t off = m_hash(key) % m_bucket_size;
+            node_t *cur = m_pool->template alloc<const Key &, const Value &>(key, v);
+            if (NULL == cur)
+            {
+                return false;
+            }
+            cur->next = m_buckets[off];
+            m_buckets[off] = cur;
+            if (pv)
+            {
+                *pv = &cur->value;
+            }
             return true;
         }
         bool remove(const Key &key, Value *pv = NULL)

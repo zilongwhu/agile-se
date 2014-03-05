@@ -19,11 +19,11 @@
 #include <pthread.h>
 #include "mempool.h"
 
-int DelayPool::s_now;
+volatile int DelayPool::s_now;
 
 static void *pool_timer_thread(void *ptr)
 {
-    int &now = *(int *)ptr;
+    volatile int &now = *(volatile int *)ptr;
     pthread_detach(pthread_self());
 
     while (1)
@@ -39,7 +39,7 @@ void DelayPool::init_time_updater()
     s_now = ::time(NULL);
 
     pthread_t pid;
-    int ret = ::pthread_create(&pid, NULL, pool_timer_thread, &s_now);
+    int ret = ::pthread_create(&pid, NULL, pool_timer_thread, (void *)&s_now);
     if (ret != 0)
     {
         ::exit(-1);
