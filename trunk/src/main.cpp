@@ -18,6 +18,7 @@
 #include "mempool.h"
 #include "sortlist.h"
 #include "idlist.h"
+#include "hashtable.h"
 
 struct A
 {
@@ -121,5 +122,38 @@ int main(int argc, char *argv[])
     }
 
     IDList ids(NULL, 0);
+
+    std::cout << "===" << std::endl;
+
+    ObjectPool<HashTable<int, int>::node_t> np;
+    np.init(4096, 4*1024*1024);
+
+    HashTable<int, int> hash1(&np, 100);
+    HashTable<int, int> hash2(&np, 1000);
+
+    hash1.set(1, 2);
+    hash1.set(2, 3);
+    hash2.set(5, 7);
+    hash2.set(3, 7);
+    hash2.set(4, 7);
+
+    int *pv;
+    hash1.get(1, &pv);
+    std::cout << *pv << std::endl;
+    hash2.get(5, &pv);
+    std::cout << *pv << std::endl;
+    hash1.remove(1);
+    std::cout << hash1.get(1) << std::endl;
+    hash2.remove(3);
+
+    std::cout << std::endl;
+    for (int i = 0; i < 6; ++i)
+    {
+        sleep(1);
+        np.recycle();
+        std::cout << DelayPool::now() << std::endl;
+        std::cout << np.free_num() << std::endl;
+        std::cout << np.delayed_num() << std::endl;
+    }
     return 0;
 }
