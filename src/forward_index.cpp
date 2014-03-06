@@ -306,6 +306,40 @@ CLEAN:
 
 bool ForwardIndex::update(long id, const std::vector<std::pair<std::string, cJSON *> > &kvs)
 {
+    for (size_t i = 0; i < kvs.size(); ++i)
+    {
+        const std::pair<std::string, cJSON *> &kv = kvs[i];
+        __gnu_cxx::hash_map<std::string, FieldDes>::const_iterator it = m_fields.find(kv.first);
+        if (it == m_fields.end())
+        {
+            continue;
+        }
+        int offset = it->second.offset;
+        int type = it->second.type;
+        if (INT_TYPE == type)
+        {
+            if (kv.second->type == cJSON_Number)
+            {
+                kv.second->valueint;
+            }
+        }
+        else if (FLOAT_TYPE == type)
+        {
+            if (kv.second->type == cJSON_Number)
+            {
+                kv.second->valuedouble;
+            }
+        }
+        else
+        {
+            FieldParser *parser = it->second.parser;
+            void *ptr = NULL;
+            if (parser->parse(kv.second, ptr))
+            {
+
+            }
+        }
+    }
     return true;
 }
 
