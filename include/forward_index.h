@@ -34,6 +34,7 @@ class ForwardIndex
         struct FieldDes
         {
             int offset;
+            int array_offset;
             int type; /* 0->int, 1->float, 2->void * */
             FieldParser *parser;
         };
@@ -60,6 +61,11 @@ class ForwardIndex
         bool update(long id, const std::vector<std::pair<std::string, cJSON *> > &kvs);
 
         void remove(long id);
+
+        void recycle()
+        {
+            m_node_pool.recycle(cleanup, this);
+        }
     private:
         struct cleanup_data_t
         {
@@ -75,7 +81,7 @@ class ForwardIndex
                 for (size_t i = 0; i < fields_need_free.size(); ++i)
                 {
                     std::pair<int, FieldParser *> &tmp = fields_need_free[i];
-                    void *ptr = ((void **)mem)[tmp.first >> 3];
+                    void *ptr = ((void **)mem)[tmp.first];
                     if (ptr)
                     {
                         tmp.second->destroy(ptr);
@@ -83,22 +89,7 @@ class ForwardIndex
                 }
             }
         };
-        static void cleanup(HashTable<long, void *>::node_t *node, void *arg)
-        {
-            ForwardIndex *ptr = (ForwardIndex *)arg;
-            if (NULL == ptr || ptr->m_delayed_list.size() == 0)
-            {
-                ::abort();
-            }
-            cleanup_data_t &cd = ptr->m_delayed_list.front();
-            if (node->value != cd.mem)
-            {
-                ::abort();
-            }
-            cd.clean();
-            ptr->m_pool.free(cd.mem);
-            ptr->m_delayed_list.pop_front();
-        }
+        static void cleanup(HashTable<long, void *>::node_t *node, void *arg);
     private:
         MemoryPool m_pool;
         ObjectPool<HashTable<long, void *>::node_t> m_node_pool;
@@ -107,6 +98,7 @@ class ForwardIndex
         __gnu_cxx::hash_map<std::string, FieldDes> m_fields;
         size_t m_info_size;
 
+        cleanup_data_t m_cleanup_data;
         std::deque<cleanup_data_t> m_delayed_list;
 };
 
