@@ -15,6 +15,7 @@
 // =====================================================================================
 
 #include <iostream>
+#include "log.h"
 #include "configure.h"
 #include "forward_index.h"
 
@@ -53,11 +54,13 @@ int ForwardIndex::init(const char *path, const char *file)
     Config config(path, file);
     if (config.parse() < 0)
     {
+        WARNING("failed parse config[%s:%s]", path, file);
         return -1;
     }
     int field_num = 0;
     if (!config.get("field_num", field_num) || field_num <= 0)
     {
+        WARNING("failed to get field_num");
         return -1;
     }
     int max_size = 0;
@@ -70,12 +73,14 @@ int ForwardIndex::init(const char *path, const char *file)
         ::snprintf(buffer, sizeof(buffer), "field_%d_name", i);
         if (!config.get(buffer, field.name))
         {
+            WARNING("failed to get %s", buffer);
             return -1;
         }
         ::snprintf(buffer, sizeof(buffer), "field_%d_type", i);
         std::string type;
         if (!config.get(buffer, type))
         {
+            WARNING("failed to get %s", buffer);
             return -1;
         }
         if ("int" == type)
@@ -95,6 +100,7 @@ int ForwardIndex::init(const char *path, const char *file)
         }
         else
         {
+            WARNING("invalid field_type of [%s] = %s", buffer, type.c_str());
             return -1;
         }
         if (SELF_DEFINE_TYPE == field.type)
@@ -102,16 +108,19 @@ int ForwardIndex::init(const char *path, const char *file)
             ::snprintf(buffer, sizeof(buffer), "field_%d_parser", i);
             if (!config.get(buffer, field.parser))
             {
+                WARNING("failed to get %s", buffer);
                 return -1;
             }
         }
         ::snprintf(buffer, sizeof(buffer), "field_%d_offset", i);
         if (!config.get(buffer, field.offset))
         {
+            WARNING("failed to get %s", buffer);
             return -1;
         }
         if (field.offset < 0 || field.offset % field.size != 0)
         {
+            WARNING("invalid %s[%d] of field[%s]", buffer, field.offset, field.name.c_str());
             return -1;
         }
         fields.push_back(field);
@@ -120,6 +129,8 @@ int ForwardIndex::init(const char *path, const char *file)
             max_size = field.offset + field.size;
         }
     }
+    WARNING("info_size = %d", max_size);
+
     std::vector<int> placeholder(max_size, -1);
     for (size_t i = 0; i < fields.size(); ++i)
     {
@@ -127,6 +138,7 @@ int ForwardIndex::init(const char *path, const char *file)
         {
             if (placeholder[fields[i].offset + j] != -1)
             {
+                WARNING("conflict configs at place[%d]", fields[i].offset + j);
                 return -1;
             }
             placeholder[fields[i].offset + j] = fields[i].offset;
@@ -140,7 +152,7 @@ int ForwardIndex::init(const char *path, const char *file)
             {
                 if (fields[j].offset == placeholder[i])
                 {
-                    std::cerr << "field[" << i << "] = " << fields[j].name << std::endl;
+                    WARNING("field[%04d], type[%d], name[%s] ", i, fields[j].type, fields[j].name.c_str());
                     break;
                 }
             }
@@ -152,20 +164,23 @@ int ForwardIndex::init(const char *path, const char *file)
 
         if (m_fields.find(fields[i].name) != m_fields.end())
         {
+            WARNING("duplicate field name[%s]", fields[i].name.c_str());
             goto FAIL;
         }
         fd.offset = fields[i].offset;
         fd.type = fields[i].type;
         if (SELF_DEFINE_TYPE == fd.type)
         {
-            std::map<std::string, FieldParser_creater>::iterator it = g_field_parsers.find(fields[i].name);
+            std::map<std::string, FieldParser_creater>::iterator it = g_field_parsers.find(fields[i].parser);
             if (it == g_field_parsers.end())
             {
+                WARNING("unsupported field parser[%s]", fields[i].parser.c_str());
                 goto FAIL;
             }
             fd.parser = (*it->second)();
             if (NULL == fd.parser)
             {
+                WARNING("failed to create field parser[%s]", fields[i].parser.c_str());
                 goto FAIL;
             }
         }
@@ -180,43 +195,53 @@ int ForwardIndex::init(const char *path, const char *file)
     int mem_page_size;
     if (!config.get("mem_page_size", mem_page_size) || mem_page_size <= 0)
     {
+        WARNING("failed to get mem_page_size");
         goto FAIL;
     }
     int mem_pool_size;
     if (!config.get("mem_pool_size", mem_pool_size) || mem_pool_size <= 0)
     {
+        WARNING("failed to get mem_pool_size");
         goto FAIL;
     }
     if (m_pool.init(m_info_size,
                 mem_page_size*1024L*1024L,
                 mem_pool_size*1024L*1024L) < 0)
     {
+        WARNING("failed to init mempool");
         goto FAIL;
     }
     int node_page_size;
     if (!config.get("node_page_size", node_page_size) || node_page_size <= 0)
     {
+        WARNING("failed to get node_page_size");
         goto FAIL;
     }
     int node_pool_size;
     if (!config.get("node_pool_size", node_pool_size) || node_pool_size <= 0)
     {
+        WARNING("failed to get node_pool_size");
         goto FAIL;
     }
     if (m_node_pool.init(node_page_size*1024L*1024L, node_pool_size*1024L*1024L) < 0)
     {
+        WARNING("failed to init nodepool");
         goto FAIL;
     }
     int bucket_size;
     if (!config.get("bucket_size", bucket_size) || bucket_size <= 0)
     {
+        WARNING("failed to get bucket_size");
         goto FAIL;
     }
     m_dict = new HashTable<long, void *>(&m_node_pool, bucket_size);
     if (NULL == m_dict)
     {
+        WARNING("failed to init hash dict");
         goto FAIL;
     }
+    WARNING("mempool[%d M, %d M], nodepool[%d M, %d M], bucket size[%d]",
+            mem_page_size, mem_pool_size, node_page_size, node_pool_size, bucket_size);
     return 0;
 FAIL:
     __gnu_cxx::hash_map<std::string, FieldDes>::iterator it = m_fields.begin();
