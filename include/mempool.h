@@ -374,9 +374,16 @@ class ObjectPool
             return m_pool.delay_free(ptr);
         }
 
-        void recycle()
+        void recycle(DelayPool::destroy_fun_t fun = NULL, void *arg = NULL)
         {
-            m_pool.recycle(destroy, NULL);
+            if (fun)
+            {
+                m_pool.recycle(fun, arg);
+            }
+            else
+            {
+                m_pool.recycle(destroy, NULL);
+            }
         }
 
         void set_delayed_time(int delayed_seconds)
