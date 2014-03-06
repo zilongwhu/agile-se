@@ -30,6 +30,23 @@ struct FieldConfig
     int size;
 };
 
+void ForwardIndex::cleanup(HashTable<long, void *>::node_t *node, void *arg)
+{
+    ForwardIndex *ptr = (ForwardIndex *)arg;
+    if (NULL == ptr || ptr->m_delayed_list.size() == 0)
+    {
+        ::abort();
+    }
+    cleanup_data_t &cd = ptr->m_delayed_list.front();
+    if (node->value != cd.mem)
+    {
+        ::abort();
+    }
+    cd.clean();
+    ptr->m_pool.free(cd.mem);
+    ptr->m_delayed_list.pop_front();
+}
+
 ForwardIndex::~ForwardIndex()
 {
     if (m_dict)
@@ -168,6 +185,7 @@ int ForwardIndex::init(const char *path, const char *file)
             goto FAIL;
         }
         fd.offset = fields[i].offset;
+        fd.array_offset = fields[i].offset / fields[i].size;
         fd.type = fields[i].type;
         if (SELF_DEFINE_TYPE == fd.type)
         {
@@ -240,6 +258,18 @@ int ForwardIndex::init(const char *path, const char *file)
         WARNING("failed to init hash dict");
         goto FAIL;
     }
+    {
+        __gnu_cxx::hash_map<std::string, FieldDes>::iterator it = m_fields.begin();
+        while (it != m_fields.end())
+        {
+            if (SELF_DEFINE_TYPE == it->second.type)
+            {
+                m_cleanup_data.fields_need_free.push_back(
+                        std::make_pair(it->second.array_offset, it->second.parser));
+            }
+            ++it;
+        }
+    }
     WARNING("mempool[%d M, %d M], nodepool[%d M, %d M], bucket size[%d]",
             mem_page_size, mem_pool_size, node_page_size, node_pool_size, bucket_size);
     return 0;
@@ -306,6 +336,29 @@ CLEAN:
 
 bool ForwardIndex::update(long id, const std::vector<std::pair<std::string, cJSON *> > &kvs)
 {
+    void *old = NULL;
+    {
+        void ***pv;
+        if (m_dict->get(id, pv))
+        {
+            old = **pv;
+        }
+    }
+    void *mem = m_pool.alloc();
+    if (NULL == mem)
+    {
+        return false;
+    }
+    if (old)
+    {
+        ::memcpy(mem, old, m_info_size);
+    }
+    else
+    {
+        ::memset(mem, 0, m_info_size);
+    }
+    cleanup_data_t cd;
+    cd.mem = NULL;
     for (size_t i = 0; i < kvs.size(); ++i)
     {
         const std::pair<std::string, cJSON *> &kv = kvs[i];
@@ -314,20 +367,20 @@ bool ForwardIndex::update(long id, const std::vector<std::pair<std::string, cJSO
         {
             continue;
         }
-        int offset = it->second.offset;
+        int array_offset = it->second.array_offset;
         int type = it->second.type;
         if (INT_TYPE == type)
         {
             if (kv.second->type == cJSON_Number)
             {
-                kv.second->valueint;
+                ((int *)mem)[array_offset] = kv.second->valueint;
             }
         }
         else if (FLOAT_TYPE == type)
         {
             if (kv.second->type == cJSON_Number)
             {
-                kv.second->valuedouble;
+                ((float *)mem)[array_offset] = kv.second->valuedouble;
             }
         }
         else
@@ -336,14 +389,33 @@ bool ForwardIndex::update(long id, const std::vector<std::pair<std::string, cJSO
             void *ptr = NULL;
             if (parser->parse(kv.second, ptr))
             {
-
+                ((void **)mem)[array_offset] = ptr;
+                cd.fields_need_free.push_back(std::make_pair(array_offset, parser));
             }
         }
+    }
+    if (old)
+    {
+        m_dict->remove(id);
+        cd.mem = old;
+        m_delayed_list.push_back(cd);
+    }
+    if (m_dict->unchecked_insert(id, mem))
+    {
+        cd.mem = mem;
+        cd.clean();
+        m_pool.free(mem);
+        return false;
     }
     return true;
 }
 
 void ForwardIndex::remove(long id)
 {
-
+    void **ptr;
+    if (m_dict->remove(id, ptr))
+    {
+        m_cleanup_data.mem = ptr;
+        m_delayed_list.push_back(m_cleanup_data);
+    }
 }
