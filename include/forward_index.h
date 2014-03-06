@@ -28,6 +28,8 @@
 class ForwardIndex
 {
     public:
+        enum { INT_TYPE = 0, FLOAT_TYPE, SELF_DEFINE_TYPE };
+
         struct FieldDes
         {
             int offset;
@@ -62,6 +64,7 @@ class ForwardIndex
 
         HashTable<long, void *> *m_dict;
         __gnu_cxx::hash_map<std::string, FieldDes> m_fields;
+        size_t m_info_size;
 };
 
 #endif

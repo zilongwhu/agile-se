@@ -17,9 +17,32 @@
 #ifndef __AGILE_SE_HASH_TABLE_H__
 #define __AGILE_SE_HASH_TABLE_H__
 
+#include <string>
 #include <functional>
 #include <ext/hash_fun.h>
 #include "mempool.h"
+
+namespace __gnu_cxx
+{
+    template<> struct hash<std::string>
+    {
+        size_t operator()(const std::string __s) const
+        {
+            hash<const char *> tmp;
+            return tmp(__s.c_str());
+        }
+    };
+};
+
+namespace std
+{
+    template <> struct equal_to<const char *>:
+        public binary_function<const char *, const char *, bool>
+        {
+            bool operator()(const char *const & __x, const char *const & __y) const
+            { return ::strcmp(__x, __y) == 0; }
+        };
+}
 
 template<typename Key, typename Value, typename HashFun = __gnu_cxx::hash<Key>, typename EqualFun = std::equal_to<Key> >
 class HashTable
