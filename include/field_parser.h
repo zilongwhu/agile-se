@@ -29,7 +29,7 @@ class FieldParser
 
         virtual bool parse(cJSON *json, void *&obj) = 0;
         virtual void *clone(void *obj) = 0;
-        virtual void destory(void *obj) = 0;
+        virtual void destroy(void *obj) = 0;
         virtual bool serialize(void *obj, void *buf, size_t buf_len, size_t &body_len) = 0;
         virtual bool deserialize(void *buf, size_t len, void *&obj) = 0;
 };

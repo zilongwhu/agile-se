@@ -17,6 +17,7 @@
 #ifndef __AGILE_SE_FORWARD_INDEX_H__
 #define __AGILE_SE_FORWARD_INDEX_H__
 
+#include <deque>
 #include <vector>
 #include <string>
 #include <utility>
@@ -60,12 +61,37 @@ class ForwardIndex
 
         void remove(long id);
     private:
+        struct cleanup_data_t
+        {
+            void *mem;
+            std::vector<std::pair<int, FieldParser *> > fields_need_free;
+
+            void clean()
+            {
+                if (NULL == mem)
+                {
+                    return ;
+                }
+                for (size_t i = 0; i < fields_need_free.size(); ++i)
+                {
+                    std::pair<int, FieldParser *> &tmp = fields_need_free[i];
+                    void *ptr = ((void **)mem)[tmp.first >> 3];
+                    if (ptr)
+                    {
+                        tmp.second->destroy(ptr);
+                    }
+                }
+            }
+        };
+    private:
         MemoryPool m_pool;
         ObjectPool<HashTable<long, void *>::node_t> m_node_pool;
 
         HashTable<long, void *> *m_dict;
         __gnu_cxx::hash_map<std::string, FieldDes> m_fields;
         size_t m_info_size;
+
+        std::deque<cleanup_data_t> m_delayed_list;
 };
 
 #endif
