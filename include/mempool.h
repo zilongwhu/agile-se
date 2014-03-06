@@ -309,6 +309,14 @@ template<typename T>
 class ObjectPool
 {
     public:
+        typedef void (*cleanup_fun_t)(T *ptr, void *arg);
+    private:
+        struct cleanup_bag_t
+        {
+            cleanup_fun_t fun;
+            void *arg;
+        };
+    public:
         ObjectPool() { }
         ~ObjectPool() { }
 
@@ -374,11 +382,16 @@ class ObjectPool
             return m_pool.delay_free(ptr);
         }
 
-        void recycle(DelayPool::destroy_fun_t fun = NULL, void *arg = NULL)
+        void recycle(cleanup_fun_t fun = NULL, void *arg = NULL)
         {
             if (fun)
             {
-                m_pool.recycle(fun, arg);
+                cleanup_bag_t bag;
+
+                bag.fun = fun;
+                bag.arg = arg;
+
+                m_pool.recycle(destroy_with_cleanup, &bag);
             }
             else
             {
@@ -399,6 +412,16 @@ class ObjectPool
         size_t delayed_num() const { return m_pool.delayed_num(); }
         size_t mem() const { return m_pool.mem(); }
     private:
+        static void destroy_with_cleanup(void *ptr, void *arg)
+        {
+            if (ptr)
+            {
+                T *p = (T *)ptr;
+                cleanup_bag_t *bag = (cleanup_bag_t *)arg;
+                bag->fun(p, bag->arg);
+                p->~T();
+            }
+        }
         static void destroy(void *ptr, void *arg)
         {
             if (ptr)
