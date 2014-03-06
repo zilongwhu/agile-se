@@ -19,6 +19,7 @@
 
 #include <map>
 #include <string>
+#include "cJSON.h"
 
 class FieldParser
 {
@@ -26,7 +27,7 @@ class FieldParser
         FieldParser() { }
         virtual ~ FieldParser() { }
 
-        virtual bool parse(const char *json, void *&obj) = 0;
+        virtual bool parse(cJSON *json, void *&obj) = 0;
         virtual void *clone(void *obj) = 0;
         virtual void destory(void *obj) = 0;
         virtual bool serialize(void *obj, void *buf, size_t buf_len, size_t &body_len) = 0;
