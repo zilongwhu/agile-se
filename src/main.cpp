@@ -20,6 +20,7 @@
 #include "idlist.h"
 #include "hashtable.h"
 #include "forward_index.h"
+#include "invert_index.h"
 
 struct A
 {
@@ -160,5 +161,7 @@ int main(int argc, char *argv[])
     ForwardIndex idx;
     idx.init("./conf", "fields.conf");
     idx.update(1, "abc", "1");
+
+    InvertIndex invert;
     return 0;
 }

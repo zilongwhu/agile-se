@@ -35,11 +35,13 @@ void ForwardIndex::cleanup(HashTable<long, void *>::node_t *node, void *arg)
     ForwardIndex *ptr = (ForwardIndex *)arg;
     if (NULL == ptr || ptr->m_delayed_list.size() == 0)
     {
+        FATAL("should not run to here");
         ::abort();
     }
     cleanup_data_t &cd = ptr->m_delayed_list.front();
     if (node->value != cd.mem)
     {
+        FATAL("should not run to here");
         ::abort();
     }
     cd.clean();
