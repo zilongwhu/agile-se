@@ -40,8 +40,8 @@ class ForwardIndex
         ForwardIndex(const ForwardIndex &);
         ForwardIndex &operator =(const ForwardIndex &);
     public:
-        ForwardIndex() { }
-        ~ForwardIndex() { }
+        ForwardIndex() { m_dict = NULL; }
+        ~ForwardIndex();
 
         int init(const char *path, const char *file);
 
@@ -56,6 +56,7 @@ class ForwardIndex
             return this->update(id, kvs);
         }
         bool update(long id, const std::vector<std::pair<std::string, std::string> > &kvs);
+        bool update(long id, const std::vector<std::pair<std::string, cJSON *> > &kvs);
 
         void remove(long id);
     private:

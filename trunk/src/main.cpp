@@ -159,5 +159,6 @@ int main(int argc, char *argv[])
 
     ForwardIndex idx;
     idx.init("./conf", "fields.conf");
+    idx.update(1, "abc", "1");
     return 0;
 }
