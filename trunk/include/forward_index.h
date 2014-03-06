@@ -83,6 +83,22 @@ class ForwardIndex
                 }
             }
         };
+        static void cleanup(HashTable<long, void *>::node_t *node, void *arg)
+        {
+            ForwardIndex *ptr = (ForwardIndex *)arg;
+            if (NULL == ptr || ptr->m_delayed_list.size() == 0)
+            {
+                ::abort();
+            }
+            cleanup_data_t &cd = ptr->m_delayed_list.front();
+            if (node->value != cd.mem)
+            {
+                ::abort();
+            }
+            cd.clean();
+            ptr->m_pool.free(cd.mem);
+            ptr->m_delayed_list.pop_front();
+        }
     private:
         MemoryPool m_pool;
         ObjectPool<HashTable<long, void *>::node_t> m_node_pool;
