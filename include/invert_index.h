@@ -28,7 +28,12 @@ class InvertIndex
         InvertIndex(const InvertIndex &);
         InvertIndex &operator =(const InvertIndex &);
     public:
-        InvertIndex() { }
+        InvertIndex()
+        {
+            m_dict = NULL;
+            m_add_dict = NULL;
+            m_del_dict = NULL;
+        }
         ~ InvertIndex() { }
     private:
         ObjectPool<HashTable<uint64_t, void *>::node_t> m_node_pool;
