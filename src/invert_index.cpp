@@ -273,5 +273,44 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int docid, void *payl
 
 bool InvertIndex::reomve(const char *keystr, uint8_t type, int docid)
 {
+    uint64_t sign = m_types.get_sign(keystr, type);
+    IDList **add_list = m_add_dict->find(sign);
+    if (add_list)
+    {
+        (*add_list)->remove(docid);
+        if ((*add_list)->size() == 0)
+        {
+            m_add_dict->remove(sign);
+        }
+    }
+    IDList **del_list = m_del_dict->find(sign);
+    if (del_list)
+    {
+        if (!(*del_list)->insert(docid, NULL))
+        {
+            WARNING("failed to remove docid[%d] for hash value[%s:%d]", docid, keystr, int(type));
+            return false;
+        }
+        if ((*del_list)->size() > 32)
+        {
+            /* merge this list */
+        }
+    }
+    else
+    {
+        IDList *tmp = m_list_pool.alloc(m_types.types[type].pool, 0);
+        if (NULL == tmp)
+        {
+            WARNING("failed to alloc IDList");
+            return false;
+        }
+        if (!tmp->insert(docid, NULL)
+                || !m_del_dict->insert(sign, tmp))
+        {
+            m_list_pool.free(tmp);
+            WARNING("failed to remove docid[%d] for hash value[%s:%d]", docid, keystr, int(type));
+            return false;
+        }
+    }
     return true;
 }
