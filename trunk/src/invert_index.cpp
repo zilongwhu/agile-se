@@ -191,3 +191,43 @@ int InvertIndex::init(const char *path, const char *file)
     }
     return 0;
 }
+
+bool InvertIndex::insert(const char *keystr, uint8_t type, int docid, const std::string &json)
+{
+    cJSON *cjson = cJSON_Parse(json.c_str());
+    if (NULL == cjson)
+    {
+        WARNING("failed to parse json[%s]", json.c_str());
+        return false;
+    }
+    bool ret = this->insert(keystr, type, docid, cjson);
+    cJSON_Delete(cjson);
+    return ret;
+}
+
+bool InvertIndex::insert(const char *keystr, uint8_t type, int docid, cJSON *json)
+{
+    if (NULL == keystr || !m_types.is_valid_type(type) || NULL == json)
+    {
+        WARNING("invalid parameter");
+        return false;
+    }
+    void *payload = m_types.types[type].parser->parse(json);
+    if (NULL == payload)
+    {
+        WARNING("failed to parse payload for invert type[%d]", int(type));
+        return false;
+    }
+    return this->insert(keystr, type, docid, payload);
+}
+
+bool InvertIndex::insert(const char *keystr, uint8_t type, int docid, void *payload)
+{
+    uint64_t sign = m_types.get_sign(keystr, type);
+    return true;
+}
+
+bool InvertIndex::reomve(const char *keystr, uint8_t type, int docid)
+{
+    return true;
+}
