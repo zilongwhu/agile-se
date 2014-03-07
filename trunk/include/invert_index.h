@@ -23,6 +23,7 @@
 #include "idlist.h"
 #include "hashtable.h"
 #include "invert_type.h"
+#include "doclist.h"
 
 class InvertIndex
 {
@@ -39,6 +40,9 @@ class InvertIndex
         ~ InvertIndex();
 
         int init(const char *path, const char *file);
+
+        DocList *trigger(const char *keystr, uint8_t type) const;
+
         bool insert(const char *keystr, uint8_t type, int docid, const std::string &json);
         bool insert(const char *keystr, uint8_t type, int docid, cJSON *json);
         bool reomve(const char *keystr, uint8_t type, int docid);
