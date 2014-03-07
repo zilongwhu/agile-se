@@ -40,6 +40,9 @@ struct InvertTypes
             types[i].type = 0xFF;
         }
     }
+
+    int init(const char *path, const char *file);
+
     bool is_valid_type(uint8_t type) const
     {
         return types[type].type == type;

@@ -14,7 +14,6 @@
 //
 // =====================================================================================
 
-#include <iostream>
 #include "log.h"
 #include "configure.h"
 #include "forward_index.h"
