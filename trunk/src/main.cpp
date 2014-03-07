@@ -21,6 +21,7 @@
 #include "hashtable.h"
 #include "forward_index.h"
 #include "invert_index.h"
+#include "invert_type.h"
 
 struct A
 {
@@ -163,5 +164,7 @@ int main(int argc, char *argv[])
     idx.update(1, "abc", "1");
 
     InvertIndex invert;
+    InvertTypes types;
+    types.get_sign("abc", 0);
     return 0;
 }
