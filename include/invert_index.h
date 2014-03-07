@@ -36,7 +36,7 @@ class InvertIndex
             m_add_dict = NULL;
             m_del_dict = NULL;
         }
-        ~ InvertIndex() { }
+        ~ InvertIndex();
 
         int init(const char *path, const char *file);
     private:
