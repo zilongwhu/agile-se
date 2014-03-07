@@ -18,6 +18,7 @@
 #define __AGILE_SE_IDLIST_H__
 
 #include <stdint.h>
+#include <string.h>
 #include "mempool.h"
 
 class IDList
