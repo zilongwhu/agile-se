@@ -18,6 +18,34 @@
 #include "configure.h"
 #include "invert_index.h"
 
+InvertIndex::~InvertIndex()
+{
+    if (m_dict)
+    {
+        delete m_dict;
+        m_dict = NULL;
+    }
+    if (m_add_dict)
+    {
+        delete m_add_dict;
+        m_add_dict = NULL;
+    }
+    if (m_del_dict)
+    {
+        delete m_del_dict;
+        m_del_dict = NULL;
+    }
+    __gnu_cxx::hash_map<size_t, DelayPool *>::iterator it = m_list_pools.begin();
+    while (it != m_list_pools.end())
+    {
+        if (it->second)
+        {
+            delete it->second;
+        }
+        ++it;
+    }
+}
+
 int InvertIndex::init(const char *path, const char *file)
 {
     if (m_types.init(path, file) < 0)
@@ -117,6 +145,13 @@ int InvertIndex::init(const char *path, const char *file)
             return -1;
         }
         ++it;
+    }
+    for (size_t i = 0; i < sizeof(m_types.types)/sizeof(m_types.types[0]); ++i)
+    {
+        if (m_types.is_valid_type(i))
+        {
+            m_types.types[i].pool = m_list_pools[m_types.types[i].payload_len];
+        }
     }
     int dict_hash_size;
     if (!config.get("dict_hash_size", dict_hash_size) || dict_hash_size <= 0)
