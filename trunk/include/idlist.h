@@ -87,6 +87,7 @@ class IDList
                 m_head = m_head->next;
                 m_pool->delay_free(cur);
             }
+            m_pool = NULL;
             m_payload_len = 0;
             m_size = 0;
         }
@@ -94,6 +95,32 @@ class IDList
         size_t payload_len() const { return m_payload_len; }
         size_t size() const { return m_size; }
 
+        iterator begin() const
+        {
+            return iterator(m_head);
+        }
+        iterator end() const
+        {
+            return iterator(NULL);
+        }
+
+        bool find(int id, void **payload = NULL) const
+        {
+            node_t *cur = m_head;
+            while (cur && cur->id < id)
+            {
+                cur = cur->next;
+            }
+            if (cur && cur->id == id)
+            {
+                if (payload)
+                {
+                    *payload = &cur->value;
+                }
+                return true;
+            }
+            return false;
+        }
         bool insert(int id, void *payload)
         {
             node_t *pre = NULL;
@@ -105,11 +132,16 @@ class IDList
             }
             if (cur && cur->id == id)
             {
-                if (m_payload_len > 0)
+                if (pre)
                 {
-                    ::memcpy(cur->value, payload, m_payload_len);
+                    pre->next = cur->next;
                 }
-                return true;
+                else
+                {
+                    m_head = cur->next;
+                }
+                m_pool->delay_free(cur);
+                --m_size;
             }
             node_t *tmp = (node_t *)m_pool->alloc();
             if (NULL == tmp)

@@ -103,23 +103,51 @@ class SortList
             return iterator(NULL);
         }
 
+        T *find(const T &v) const
+        {
+            node_t *cur = m_head;
+            while (cur && cur->value < v)
+            {
+                cur = cur->next;
+            }
+            if (cur && cur->value == v)
+            {
+                return &cur->value;
+            }
+            return NULL;
+        }
+
         bool insert(const T &v)
         {
-            std::pair<bool, node_t *> ret = this->find_(v);
-            if (ret.first)
+            node_t *pre = NULL;
+            node_t *cur = m_head;
+            while (cur && cur->value < v)
             {
-                ret.second->value = v;
-                return true;
+                pre = cur;
+                cur = cur->next;
+            }
+            if (cur && cur->value == v)
+            {
+                if (pre)
+                {
+                    pre->next = cur->next;
+                }
+                else
+                {
+                    m_head = cur->next;
+                }
+                m_pool->delay_free(cur);
+                --m_size;
             }
             node_t *tmp = m_pool->template alloc<const T &>(v);
             if (NULL == tmp)
             {
                 return false;
             }
-            if (ret.second)
+            if (pre)
             {
-                tmp->next = ret.second->next;
-                ret.second->next = tmp;
+                tmp->next = pre->next;
+                pre->next = tmp;
             }
             else
             {
@@ -157,40 +185,6 @@ class SortList
         void recycle()
         {
             m_pool->recycle();
-        }
-
-        T *find(const T &v) const
-        {
-            std::pair<bool, node_t *> ret = this->find_(v);
-            if (ret.first)
-            {
-                return &ret.second->value;
-            }
-            return NULL;
-        }
-    private:
-        std::pair<bool, node_t *> find_(const T &v) const
-        {
-            std::pair<bool, node_t *> ret;
-
-            ret.first = false;
-            ret.second = NULL;
-
-            node_t *cur = m_head;
-            while (cur && cur->value < v)
-            {
-                ret.second = cur;
-                cur = cur->next;
-            }
-            if (cur)
-            {
-                if (cur->value == v)
-                {
-                    ret.first = true;
-                    ret.second = cur;
-                }
-            }
-            return ret;
         }
     private:
         node_t *m_head;

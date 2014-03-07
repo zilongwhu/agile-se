@@ -224,6 +224,50 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int docid, cJSON *jso
 bool InvertIndex::insert(const char *keystr, uint8_t type, int docid, void *payload)
 {
     uint64_t sign = m_types.get_sign(keystr, type);
+    IDList **del_list = m_del_dict->find(sign);
+    if (del_list)
+    {
+        (*del_list)->remove(docid);
+        if ((*del_list)->size() == 0)
+        {
+            m_del_dict->remove(sign);
+        }
+    }
+    size_t payload_len = m_types.types[type].payload_len;
+    IDList **add_list = m_add_dict->find(sign);
+    if (add_list)
+    {
+        if ((*add_list)->payload_len() != payload_len)
+        {
+            WARNING("conflicting hash value[%s:%d]", keystr, int(type));
+            return false;
+        }
+        if (!(*add_list)->insert(docid, payload))
+        {
+            WARNING("failed to insert docid[%d] for hash value[%s:%d]", docid, keystr, int(type));
+            return false;
+        }
+        if ((*add_list)->size() > 32)
+        {
+            /* merge this list */
+        }
+    }
+    else
+    {
+        IDList *tmp = m_list_pool.alloc(m_types.types[type].pool, payload_len);
+        if (NULL == tmp)
+        {
+            WARNING("failed to alloc IDList");
+            return false;
+        }
+        if (!tmp->insert(docid, payload)
+                || !m_add_dict->insert(sign, tmp))
+        {
+            m_list_pool.free(tmp);
+            WARNING("failed to insert docid[%d] for hash value[%s:%d]", docid, keystr, int(type));
+            return false;
+        }
+    }
     return true;
 }
 
