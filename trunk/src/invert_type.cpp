@@ -94,17 +94,6 @@ int InvertTypes::init(const char *path, const char *file)
     }
     return 0;
 FAIL:
-    for (int i = 0; i < invert_num; ++i)
-    {
-        if (types[i].parser)
-        {
-            delete types[i].parser;
-        }
-    }
-    ::memset(types, 0, sizeof types);
-    for (size_t i = 0; i < sizeof(types)/sizeof(types[0]); ++i)
-    {
-        types[i].type = 0xFF;
-    }
+    this->destroy();
     return -1;
 }

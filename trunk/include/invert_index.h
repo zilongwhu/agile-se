@@ -18,9 +18,11 @@
 #define __AGILE_SE_INVERT_INDEX_H__
 
 #include <stdint.h>
+#include <ext/hash_map>
 #include "mempool.h"
 #include "idlist.h"
 #include "hashtable.h"
+#include "invert_type.h"
 
 class InvertIndex
 {
@@ -35,7 +37,11 @@ class InvertIndex
             m_del_dict = NULL;
         }
         ~ InvertIndex() { }
+
+        int init(const char *path, const char *file);
     private:
+        InvertTypes m_types;
+
         ObjectPool<HashTable<uint64_t, void *>::node_t> m_node_pool;
         ObjectPool<HashTable<uint64_t, IDList *>::node_t> m_diff_node_pool;
 

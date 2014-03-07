@@ -34,11 +34,11 @@ struct InvertTypes
 
     InvertTypes()
     {
-        ::memset(types, 0, sizeof types);
-        for (size_t i = 0; i < sizeof(types)/sizeof(types[0]); ++i)
-        {
-            types[i].type = 0xFF;
-        }
+        this->clear();
+    }
+    ~InvertTypes()
+    {
+        this->destroy();
     }
 
     int init(const char *path, const char *file);
@@ -61,6 +61,26 @@ struct InvertTypes
         sign <<= 32;
         sign |= md5res[2]+md5res[3];
         return sign;
+    }
+
+    void destroy()
+    {
+        for (size_t i = 0; i < sizeof(types)/sizeof(types[0]); ++i)
+        {
+            if (types[i].parser)
+            {
+                delete types[i].parser;
+            }
+        }
+        this->clear();
+    }
+    void clear()
+    {
+        ::memset(types, 0, sizeof types);
+        for (size_t i = 0; i < sizeof(types)/sizeof(types[0]); ++i)
+        {
+            types[i].type = 0xFF;
+        }
     }
 };
 
