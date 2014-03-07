@@ -43,11 +43,11 @@ class InvertIndex
 
         DocList *trigger(const char *keystr, uint8_t type) const;
 
-        bool insert(const char *keystr, uint8_t type, int docid, const std::string &json);
-        bool insert(const char *keystr, uint8_t type, int docid, cJSON *json);
-        bool reomve(const char *keystr, uint8_t type, int docid);
+        bool insert(const char *keystr, uint8_t type, int32_t docid, const std::string &json);
+        bool insert(const char *keystr, uint8_t type, int32_t docid, cJSON *json);
+        bool reomve(const char *keystr, uint8_t type, int32_t docid);
     private:
-        bool insert(const char *keystr, uint8_t type, int docid, void *payload);
+        bool insert(const char *keystr, uint8_t type, int32_t docid, void *payload);
     private:
         InvertTypes m_types;
 
