@@ -39,6 +39,11 @@ class InvertIndex
         ~ InvertIndex();
 
         int init(const char *path, const char *file);
+        bool insert(const char *keystr, uint8_t type, int docid, const std::string &json);
+        bool insert(const char *keystr, uint8_t type, int docid, cJSON *json);
+        bool reomve(const char *keystr, uint8_t type, int docid);
+    private:
+        bool insert(const char *keystr, uint8_t type, int docid, void *payload);
     private:
         InvertTypes m_types;
 
