@@ -71,6 +71,9 @@ class IDList
             private:
                 node_t *m_cur;
         };
+    private:
+        IDList(const IDList &);
+        IDList &operator =(const IDList &);
     public:
         IDList(DelayPool *pool, size_t payload_len)
         {
