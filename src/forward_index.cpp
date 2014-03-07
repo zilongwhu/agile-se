@@ -300,10 +300,10 @@ int ForwardIndex::get_offset_by_name(const char *name) const
 
 void *ForwardIndex::get_info_by_id(long id) const
 {
-    void ***value;
-    if (m_dict->get(id, value))
+    void **value = m_dict->find(id);
+    if (value)
     {
-        return **value;
+        return *value;
     }
     return NULL;
 }
@@ -339,10 +339,10 @@ bool ForwardIndex::update(long id, const std::vector<std::pair<std::string, cJSO
 {
     void *old = NULL;
     {
-        void ***pv;
-        if (m_dict->get(id, pv))
+        void **pv = m_dict->find(id);
+        if (pv)
         {
-            old = **pv;
+            old = *pv;
         }
     }
     void *mem = m_pool.alloc();
@@ -395,18 +395,17 @@ bool ForwardIndex::update(long id, const std::vector<std::pair<std::string, cJSO
             }
         }
     }
-    if (old)
-    {
-        m_dict->remove(id);
-        cd.mem = old;
-        m_delayed_list.push_back(cd);
-    }
-    if (m_dict->unchecked_insert(id, mem))
+    if (!m_dict->insert(id, mem))
     {
         cd.mem = mem;
         cd.clean();
         m_pool.free(mem);
         return false;
+    }
+    if (old)
+    {
+        cd.mem = old;
+        m_delayed_list.push_back(cd);
     }
     return true;
 }

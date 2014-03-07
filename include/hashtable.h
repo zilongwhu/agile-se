@@ -101,11 +101,11 @@ class HashTable
         size_t bucket_size() const { return m_bucket_size; }
         size_t size() const { return m_size; }
 
-        bool get(const Key &key, Value **pv = NULL) const
+        Value *find(const Key &key) const
         {
             if (NULL == m_buckets)
             {
-                return false;
+                return NULL;
             }
             size_t off = m_hash(key) % m_bucket_size;
             node_t *cur = m_buckets[off];
@@ -113,31 +113,40 @@ class HashTable
             {
                 if (m_equal(key, cur->key))
                 {
-                    if (pv)
-                    {
-                        *pv = &cur->value;
-                    }
-                    return true;
+                    return &cur->value;
                 }
                 cur = cur->next;
             }
-            return false;
+            return NULL;
         }
-        bool set(const Key &key, const Value &v, Value **pv = NULL)
+
+        bool insert(const Key &key, const Value &v)
         {
             if (NULL == m_buckets)
             {
                 return false;
             }
             size_t off = m_hash(key) % m_bucket_size;
+
+            node_t *pre = NULL;
             node_t *cur = m_buckets[off];
             while (cur)
             {
                 if (m_equal(key, cur->key))
                 {
-                    cur->value = v;
-                    goto RET_TRUE;
+                    if (pre)
+                    {
+                        pre->next = cur->next;
+                    }
+                    else
+                    {
+                        m_buckets[off] = cur->next;
+                    }
+                    m_pool->delay_free(cur);
+                    --m_size;
+                    break;
                 }
+                pre = cur;
                 cur = cur->next;
             }
             cur = m_pool->template alloc<const Key &, const Value &>(key, v);
@@ -145,37 +154,20 @@ class HashTable
             {
                 return false;
             }
-            cur->next = m_buckets[off];
-            m_buckets[off] = cur;
-            ++m_size;
-RET_TRUE:
-            if (pv)
+            if (pre)
             {
-                *pv = &cur->value;
+                cur->next = pre->next;
+                pre->next = cur;
             }
-            return true;
-        }
-        bool unchecked_insert(const Key &key, const Value &v, Value **pv = NULL)
-        {
-            if (NULL == m_buckets)
+            else
             {
-                return false;
-            }
-            size_t off = m_hash(key) % m_bucket_size;
-            node_t *cur = m_pool->template alloc<const Key &, const Value &>(key, v);
-            if (NULL == cur)
-            {
-                return false;
-            }
-            cur->next = m_buckets[off];
-            m_buckets[off] = cur;
-            if (pv)
-            {
-                *pv = &cur->value;
+                cur->next = m_buckets[off];
+                m_buckets[off] = cur;
             }
             ++m_size;
             return true;
         }
+
         bool remove(const Key &key, Value *pv = NULL)
         {
             if (NULL == m_buckets)
