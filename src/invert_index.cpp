@@ -49,7 +49,7 @@ int InvertIndex::init(const char *path, const char *file)
         return -1;
     }
     int diff_node_page_size;
-    if (!config.get("diff_diff_node_page_size", diff_node_page_size) || diff_node_page_size <= 0)
+    if (!config.get("diff_node_page_size", diff_node_page_size) || diff_node_page_size <= 0)
     {
         WARNING("failed to get diff_node_page_size");
         return -1;
@@ -66,7 +66,7 @@ int InvertIndex::init(const char *path, const char *file)
         return -1;
     }
     int list_page_size;
-    if (!config.get("diff_list_page_size", list_page_size) || list_page_size <= 0)
+    if (!config.get("list_page_size", list_page_size) || list_page_size <= 0)
     {
         WARNING("failed to get list_page_size");
         return -1;
@@ -80,6 +80,18 @@ int InvertIndex::init(const char *path, const char *file)
     if (m_list_pool.init(list_page_size*1024L*1024L, list_pool_size*1024L*1024L) < 0)
     {
         WARNING("failed to init list_pool");
+        return -1;
+    }
+    int list_node_page_size;
+    if (!config.get("list_node_page_size", list_node_page_size) || list_node_page_size <= 0)
+    {
+        WARNING("failed to get list_node_page_size");
+        return -1;
+    }
+    int list_node_pool_size;
+    if (!config.get("list_node_pool_size", list_node_pool_size) || list_node_pool_size <= 0)
+    {
+        WARNING("failed to get list_node_pool_size");
         return -1;
     }
     for (size_t i = 0; i < sizeof(m_types.types)/sizeof(m_types.types[0]); ++i)
@@ -98,7 +110,8 @@ int InvertIndex::init(const char *path, const char *file)
             WARNING("failed to new list_pools");
             return -1;
         }
-        if (it->second->init(IDList::element_size(it->first), list_page_size*1024L*1024L, list_pool_size*1024L*1024L) < 0)
+        if (it->second->init(IDList::element_size(it->first),
+                    list_node_page_size*1024L*1024L, list_node_pool_size*1024L*1024L) < 0)
         {
             WARNING("failed to init list_pools");
             return -1;
