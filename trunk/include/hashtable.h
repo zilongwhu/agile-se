@@ -57,6 +57,9 @@ class HashTable
             node_t() : next(NULL) { }
             node_t(const Key &k, const Value &v) : next(NULL), key(k), value(v) { }
         };
+    private:
+        HashTable(const HashTable &);
+        HashTable &operator =(const HashTable &);
     public:
         HashTable(ObjectPool<node_t> *pool, size_t bucket_size)
         {

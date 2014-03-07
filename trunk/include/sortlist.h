@@ -73,6 +73,9 @@ class SortList
             private:
                 node_t *m_cur;
         };
+    private:
+        SortList(const SortList &);
+        SortList &operator =(const SortList &);
     public:
         SortList(ObjectPool<node_t> *pool)
         {
