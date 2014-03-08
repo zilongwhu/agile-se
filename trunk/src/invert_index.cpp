@@ -555,6 +555,92 @@ int InvertIndex::init(const char *path, const char *file)
     return 0;
 }
 
+DocList *InvertIndex::trigger(const char *keystr, uint8_t type) const
+{
+    if (NULL == keystr || !m_types.is_valid_type(type))
+    {
+        WARNING("invalid parameter");
+        return NULL;
+    }
+    uint64_t sign = m_types.get_sign(keystr, type);
+    return this->trigger(sign, type);
+}
+
+DocList *InvertIndex::trigger(uint64_t sign, uint8_t type) const
+{
+    void **big = m_dict->find(sign);
+    IDList **add = m_add_dict->find(sign);
+
+    if (NULL == big && NULL == add)
+    {
+        return NULL;
+    }
+
+    IDList **del = m_del_dict->find(sign);
+
+    BigList *bl = NULL;
+    if (big)
+    {
+        bl = new(std::nothrow) BigList(sign, *big);
+        if (NULL == bl)
+        {
+            WARNING("failed to new BigList");
+            return NULL;
+        }
+    }
+    AddList *al = NULL;
+    if (add)
+    {
+        al = new(std::nothrow) AddList(sign, type,
+                m_types.types[type].payload_len, (*add)->begin());
+        if (NULL == al)
+        {
+            WARNING("failed to new AddList");
+            if (bl)
+            {
+                delete bl;
+            }
+            return NULL;
+        }
+    }
+    DeleteList *dl = NULL;
+    if (del)
+    {
+        dl = new(std::nothrow) DeleteList((*del)->begin());
+        if (NULL == dl)
+        {
+            WARNING("failed to new DeleteList");
+            if (bl)
+            {
+                delete bl;
+            }
+            if (al)
+            {
+                delete al;
+            }
+            return NULL;
+        }
+    }
+    MergeList *ml = new(std::nothrow) MergeList(bl, al, dl);
+    if (ml)
+    {
+        return ml;
+    }
+    if (bl)
+    {
+        delete bl;
+    }
+    if (al)
+    {
+        delete al;
+    }
+    if (dl)
+    {
+        delete dl;
+    }
+    return NULL;
+}
+
 bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, const std::string &json)
 {
     cJSON *cjson = cJSON_Parse(json.c_str());
@@ -680,130 +766,62 @@ bool InvertIndex::reomve(const char *keystr, uint8_t type, int32_t docid)
 
 void InvertIndex::merge(uint64_t sign, uint8_t type)
 {
-    void **big = m_dict->find(sign);
-    IDList **add = m_add_dict->find(sign);
-    IDList **del = m_del_dict->find(sign);
-
     const int payload_len = m_types.types[type].payload_len;
+    DocList *list = this->trigger(sign, type);
+    if (list)
+    {
+        int docnum = 0;
+        int32_t docid = list->first();
+        while (docid != -1)
+        {
+            ++docnum;
+            docid = list->next();
+        }
+        if (docnum > 0)
+        {
+            void *mem = ::malloc(sizeof(bl_head_t) + sizeof(int32_t)*docnum + payload_len*docnum);
+            if (mem)
+            {
+                DummyStrategy st;
 
-    BigList *bl = NULL;
-    if (big)
-    {
-        bl = new(std::nothrow) BigList(sign, *big);
-        if (NULL == bl)
-        {
-            WARNING("failed to new BigList");
-            return ;
-        }
-    }
-    AddList *al = NULL;
-    if (add)
-    {
-        al = new(std::nothrow) AddList(sign, type, payload_len, (*add)->begin());
-        if (NULL == al)
-        {
-            WARNING("failed to new AddList");
-            if (bl)
-            {
-                delete bl;
-            }
-            return ;
-        }
-    }
-    DeleteList *dl = NULL;
-    if (del)
-    {
-        dl = new(std::nothrow) DeleteList((*del)->begin());
-        if (NULL == dl)
-        {
-            WARNING("failed to new DeleteList");
-            if (bl)
-            {
-                delete bl;
-            }
-            if (al)
-            {
-                delete al;
-            }
-            return ;
-        }
-    }
-    if (bl || al)
-    {
-        MergeList *ml = new(std::nothrow) MergeList(bl, al, dl);
-        if (ml)
-        {
-            int docnum = 0;
-            int32_t docid = ml->first();
-            while (docid != -1)
-            {
-                ++docnum;
-                docid = ml->next();
-            }
-            if (docnum > 0)
-            {
-                void *mem = ::malloc(sizeof(bl_head_t) + sizeof(int32_t)*docnum + payload_len*docnum);
-                if (mem)
+                bl_head_t *head = (bl_head_t *)mem;
+                head->type = type;
+                head->payload_len = payload_len;
+                head->doc_num = docnum;
+
+                int32_t *docids = (int32_t *)(head + 1);
+                void *payload = docids + docnum;
+
+                docid = list->first();
+                while (docid != -1)
                 {
-                    DummyStrategy st;
-
-                    bl_head_t *head = (bl_head_t *)mem;
-                    head->type = type;
-                    head->payload_len = payload_len;
-                    head->doc_num = docnum;
-
-                    int32_t *docids = (int32_t *)(head + 1);
-                    void *payload = docids + docnum;
-
-                    docid = ml->first();
-                    while (docid != -1)
+                    *docids++ = docid;
+                    if (payload_len > 0)
                     {
-                        *docids++ = docid;
-                        if (payload_len > 0)
-                        {
-                            ::memcpy(payload, ml->get_strategy_data(st)->result, payload_len);
-                            payload = ((int8_t *)payload) + payload_len;
-                        }
-                        docid = ml->next();
+                        ::memcpy(payload, list->get_strategy_data(st)->result, payload_len);
+                        payload = ((int8_t *)payload) + payload_len;
                     }
-                    m_add_dict->remove(sign);
-                    m_del_dict->remove(sign);
-                    if (!m_dict->insert(sign, mem))
-                    {
-                        ::free(mem);
-                    }
+                    docid = list->next();
                 }
-                else
+                m_add_dict->remove(sign);
+                m_del_dict->remove(sign);
+                if (!m_dict->insert(sign, mem))
                 {
-                    WARNING("failed to alloc mem[%d]", (sizeof(bl_head_t)
-                                + sizeof(int32_t)*docnum + payload_len*docnum));
+                    ::free(mem);
                 }
             }
             else
             {
-                m_dict->remove(sign);
-                m_add_dict->remove(sign);
-                m_del_dict->remove(sign);
+                WARNING("failed to alloc mem[%d]", (sizeof(bl_head_t)
+                            + sizeof(int32_t)*docnum + payload_len*docnum));
             }
-            delete ml;
-            return ;
         }
-        WARNING("failed to new MergeList");
-    }
-    else
-    {
-        WARNING("only has delete list");
-    }
-    if (bl)
-    {
-        delete bl;
-    }
-    if (al)
-    {
-        delete al;
-    }
-    if (dl)
-    {
-        delete dl;
+        else
+        {
+            m_dict->remove(sign);
+            m_add_dict->remove(sign);
+            m_del_dict->remove(sign);
+        }
+        delete list;
     }
 }
