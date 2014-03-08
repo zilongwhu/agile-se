@@ -150,8 +150,8 @@ class AddList: public DocList
     public:
         typedef IDList::iterator Iterator;
 
-        AddList(uint64_t sign, uint8_t type, uint16_t payload_len, Iterator &it)
-            : m_it(it), m_end(NULL)
+        AddList(uint64_t sign, uint8_t type, uint16_t payload_len, Iterator it)
+            : m_it(it), m_it_c(it), m_end(NULL)
         {
             m_sign = sign;
             m_type = type;
@@ -160,6 +160,7 @@ class AddList: public DocList
 
         int32_t first()
         {
+            m_it = m_it_c;
             return curr();
         }
         int32_t next()
@@ -212,6 +213,7 @@ class AddList: public DocList
         uint8_t m_type;
         uint16_t m_payload_len;
         Iterator m_it;
+        Iterator m_it_c;
         Iterator m_end;
 };
 
@@ -220,10 +222,11 @@ class DeleteList: public DocList
     public:
         typedef IDList::iterator Iterator;
 
-        DeleteList(Iterator &it): m_it(it), m_end(NULL) { }
+        DeleteList(Iterator it): m_it(it), m_it_c(it), m_end(NULL) { }
 
         int32_t first()
         {
+            m_it = m_it_c;
             return curr();
         }
         int32_t next()
@@ -260,6 +263,7 @@ class DeleteList: public DocList
         }
     private:
         Iterator m_it;
+        Iterator m_it_c;
         Iterator m_end;
 };
 
@@ -608,7 +612,7 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, void *
         }
         if ((*add_list)->size() > 32)
         {
-            /* merge this list */
+            this->merge(sign, type);
         }
     }
     else
@@ -652,7 +656,7 @@ bool InvertIndex::reomve(const char *keystr, uint8_t type, int32_t docid)
         }
         if ((*del_list)->size() > 32)
         {
-            /* merge this list */
+            this->merge(sign, type);
         }
     }
     else
@@ -672,4 +676,121 @@ bool InvertIndex::reomve(const char *keystr, uint8_t type, int32_t docid)
         }
     }
     return true;
+}
+
+void InvertIndex::merge(uint64_t sign, uint8_t type)
+{
+    void **big = m_dict->find(sign);
+    IDList **add = m_add_dict->find(sign);
+    IDList **del = m_del_dict->find(sign);
+
+    const int payload_len = m_types.types[type].payload_len;
+
+    BigList *bl = NULL;
+    if (big)
+    {
+        bl = new(std::nothrow) BigList(sign, *big);
+        if (NULL == bl)
+        {
+            return ;
+        }
+    }
+    AddList *al = NULL;
+    if (add)
+    {
+        al = new(std::nothrow) AddList(sign, type, payload_len, (*add)->begin());
+        if (NULL == al)
+        {
+            if (bl)
+            {
+                delete bl;
+            }
+            return ;
+        }
+    }
+    DeleteList *dl = NULL;
+    if (del)
+    {
+        dl = new(std::nothrow) DeleteList((*del)->begin());
+        if (NULL == dl)
+        {
+            if (bl)
+            {
+                delete bl;
+            }
+            if (al)
+            {
+                delete al;
+            }
+            return ;
+        }
+    }
+    if (bl || al)
+    {
+        MergeList *ml = new(std::nothrow) MergeList(bl, al, dl);
+        if (ml)
+        {
+            int docnum = 0;
+            int32_t docid = ml->first();
+            while (docid != -1)
+            {
+                ++docnum;
+                docid = ml->next();
+            }
+            if (docnum > 0)
+            {
+                void *mem = ::malloc(sizeof(bl_head_t) + sizeof(int32_t)*docnum + payload_len*docnum);
+                if (mem)
+                {
+                    DummyStrategy st;
+
+                    bl_head_t *head = (bl_head_t *)mem;
+                    head->type = type;
+                    head->payload_len = payload_len;
+                    head->doc_num = docnum;
+
+                    int32_t *docids = (int32_t *)(head + 1);
+                    void *payload = docids + docnum;
+
+                    docid = ml->first();
+                    while (docid != -1)
+                    {
+                        *docids++ = docid;
+                        if (payload_len > 0)
+                        {
+                            ::memcpy(payload, ml->get_strategy_data(st)->result, payload_len);
+                            payload = ((int8_t *)payload) + payload_len;
+                        }
+                        docid = ml->next();
+                    }
+                    m_add_dict->remove(sign);
+                    m_del_dict->remove(sign);
+                    if (!m_dict->insert(sign, mem))
+                    {
+                        ::free(mem);
+                    }
+                }
+            }
+            else
+            {
+                m_dict->remove(sign);
+                m_add_dict->remove(sign);
+                m_del_dict->remove(sign);
+            }
+            delete ml;
+            return ;
+        }
+    }
+    if (bl)
+    {
+        delete bl;
+    }
+    if (al)
+    {
+        delete al;
+    }
+    if (dl)
+    {
+        delete dl;
+    }
 }
