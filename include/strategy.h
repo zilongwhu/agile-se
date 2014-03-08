@@ -52,4 +52,11 @@ class InvertStrategy
         virtual void work(const info_t *left, const info_t *right, int list_op, info_t *result) = 0;
 };
 
+class DummyStrategy: public InvertStrategy
+{
+    public:
+        void work(info_t *info) { }
+        void work(const info_t *left, const info_t *right, int list_op, info_t *result) { }
+};
+
 #endif
