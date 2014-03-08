@@ -46,10 +46,26 @@ class InvertIndex
         bool insert(const char *keystr, uint8_t type, int32_t docid, const std::string &json);
         bool insert(const char *keystr, uint8_t type, int32_t docid, cJSON *json);
         bool reomve(const char *keystr, uint8_t type, int32_t docid);
+
+        void recycle()
+        {
+            m_node_pool.recycle(cleanup_node, this);
+            m_diff_node_pool.recycle(cleanup_diff_node, this);
+
+            __gnu_cxx::hash_map<size_t, DelayPool *>::iterator it = m_list_pools.begin();
+            while (it != m_list_pools.end())
+            {
+                it->second->recycle();
+                ++it;
+            }
+        }
     private:
         DocList *trigger(uint64_t sign, uint8_t type) const;
         bool insert(const char *keystr, uint8_t type, int32_t docid, void *payload);
         void merge(uint64_t sign, uint8_t type);
+    private:
+        static void cleanup_node(HashTable<uint64_t, void *>::node_t *node, void *arg);
+        static void cleanup_diff_node(HashTable<uint64_t, IDList *>::node_t *node, void *arg);
     private:
         InvertTypes m_types;
 
