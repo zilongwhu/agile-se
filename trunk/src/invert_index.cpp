@@ -692,6 +692,7 @@ void InvertIndex::merge(uint64_t sign, uint8_t type)
         bl = new(std::nothrow) BigList(sign, *big);
         if (NULL == bl)
         {
+            WARNING("failed to new BigList");
             return ;
         }
     }
@@ -701,6 +702,7 @@ void InvertIndex::merge(uint64_t sign, uint8_t type)
         al = new(std::nothrow) AddList(sign, type, payload_len, (*add)->begin());
         if (NULL == al)
         {
+            WARNING("failed to new AddList");
             if (bl)
             {
                 delete bl;
@@ -714,6 +716,7 @@ void InvertIndex::merge(uint64_t sign, uint8_t type)
         dl = new(std::nothrow) DeleteList((*del)->begin());
         if (NULL == dl)
         {
+            WARNING("failed to new DeleteList");
             if (bl)
             {
                 delete bl;
@@ -770,6 +773,11 @@ void InvertIndex::merge(uint64_t sign, uint8_t type)
                         ::free(mem);
                     }
                 }
+                else
+                {
+                    WARNING("failed to alloc mem[%d]", (sizeof(bl_head_t)
+                                + sizeof(int32_t)*docnum + payload_len*docnum));
+                }
             }
             else
             {
@@ -780,6 +788,11 @@ void InvertIndex::merge(uint64_t sign, uint8_t type)
             delete ml;
             return ;
         }
+        WARNING("failed to new MergeList");
+    }
+    else
+    {
+        WARNING("only has delete list");
     }
     if (bl)
     {
