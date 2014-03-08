@@ -19,6 +19,8 @@
 
 #include <stdint.h>
 #include <ext/hash_map>
+#include <string>
+#include <vector>
 #include "mempool.h"
 #include "idlist.h"
 #include "hashtable.h"
@@ -27,6 +29,12 @@
 
 class InvertIndex
 {
+    public:
+        struct term_t
+        {
+            uint8_t type;
+            std::string word;
+        };
     private:
         InvertIndex(const InvertIndex &);
         InvertIndex &operator =(const InvertIndex &);
@@ -41,6 +49,7 @@ class InvertIndex
 
         int init(const char *path, const char *file);
 
+        DocList *parse(const std::string &query, const std::vector<term_t> terms) const;
         DocList *trigger(const char *keystr, uint8_t type) const;
 
         bool insert(const char *keystr, uint8_t type, int32_t docid, const std::string &json);
