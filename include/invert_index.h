@@ -47,6 +47,7 @@ class InvertIndex
         bool insert(const char *keystr, uint8_t type, int32_t docid, cJSON *json);
         bool reomve(const char *keystr, uint8_t type, int32_t docid);
     private:
+        DocList *trigger(uint64_t sign, uint8_t type) const;
         bool insert(const char *keystr, uint8_t type, int32_t docid, void *payload);
         void merge(uint64_t sign, uint8_t type);
     private:
