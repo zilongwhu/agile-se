@@ -14,8 +14,11 @@
 //
 // =====================================================================================
 
+#include <stack>
 #include "log.h"
+#include "parser.h"
 #include "orlist.h"
+#include "andlist.h"
 #include "difflist.h"
 #include "configure.h"
 #include "invert_index.h"
@@ -852,4 +855,138 @@ void InvertIndex::cleanup_diff_node(HashTable<uint64_t, IDList *>::node_t *node,
     {
         ptr->m_list_pool.free(node->value);
     }
+}
+
+DocList *InvertIndex::parse(const std::string &query, const std::vector<term_t> terms) const
+{
+    if(0 == query.length())
+    {
+        TRACE("query is empty when parse term query");
+        return NULL;
+    }
+    std::vector<std::string> tokens;
+    if(::infix2postfix(query, tokens) != 0)
+    {
+        WARNING("fail to parse query: %s", query.c_str());
+        return NULL;
+    }
+    DocList *left = NULL;
+    DocList *right = NULL;
+    DocList *temp_result = NULL;
+    InvertStrategy::data_t data; data.i64 = 0;
+    std::stack<DocList *> doclist_stack;
+    for (size_t i = 0; i < tokens.size(); ++i)
+    {
+        std::string &token = tokens[i];
+        switch (token.c_str()[0])
+        {
+            case '&':
+            case '|':
+            case '-':
+                {
+                    if (doclist_stack.size() < 2)
+                    {
+                        WARNING("invalid post expression, query[%s]", query.c_str());
+                        goto FAIL;
+                    }
+                    right = doclist_stack.top();
+                    doclist_stack.pop();
+                    left = doclist_stack.top();
+                    doclist_stack.pop();
+                    if (token == "&")
+                    {
+                        if (left && right)
+                        {
+                            temp_result = new (std::nothrow) AndList(left, right);
+                            if (NULL == temp_result)
+                            {
+                                delete left;
+                                delete right;
+                                WARNING("failed to new andlist");
+                                goto FAIL;
+                            }
+                        }
+                        else
+                        {
+                            if (left) delete left;
+                            if (right) delete right;
+                            temp_result = NULL;
+                        }
+                    }
+                    else if (token == "|")
+                    {
+                        if (left && right)
+                        {
+                            temp_result = new (std::nothrow) OrList(left, right);
+                            if (NULL == temp_result)
+                            {
+                                delete left;
+                                delete right;
+                                WARNING("failed to new orlist");
+                                goto FAIL;
+                            }
+                        }
+                        else if (left) temp_result = left;
+                        else temp_result = right;
+                    }
+                    else if (token == "-")
+                    {
+                        if (left && right)
+                        {
+                            temp_result = new (std::nothrow) DiffList(left, right);
+                            if (NULL == temp_result)
+                            {
+                                delete left;
+                                delete right;
+                                WARNING("failed to new difflist");
+                                goto FAIL;
+                            }
+                        }
+                        else
+                        {
+                            if (right) delete right;
+                            temp_result = left;
+                        }
+                    }
+                    else
+                    {
+                        WARNING("invalid post expression, query[%s]", query.c_str());
+                        goto FAIL;
+                    }
+                    doclist_stack.push(temp_result);
+                }
+                break;
+            default:
+                {
+                    uint32_t pos = ::atoi(token.c_str());
+                    if (pos >= uint32_t(terms.size()))
+                    {
+                        WARNING("pos is: %u, but array size is: %d", pos, int(terms.size()));
+                        goto FAIL;
+                    }
+                    temp_result = this->trigger(terms[pos].word.c_str(), terms[pos].type);
+                    if (temp_result)
+                    {
+                        data.i32 = pos;
+                        temp_result->set_data(data); /* 保存触发点偏移位置 */
+                    }
+                    doclist_stack.push(temp_result);
+                }
+                break;
+        }
+    }
+    if (doclist_stack.size() != 1)
+    {
+        WARNING("not unique doclist result");
+        goto FAIL;
+    }
+    return doclist_stack.top();
+FAIL:
+    while (doclist_stack.size() > 0)
+    {
+        DocList *tmp = doclist_stack.top();
+        if (tmp) delete tmp;
+        doclist_stack.pop();
+    }
+    return NULL;
 }
