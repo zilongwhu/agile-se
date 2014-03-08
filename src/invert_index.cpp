@@ -825,3 +825,31 @@ void InvertIndex::merge(uint64_t sign, uint8_t type)
         delete list;
     }
 }
+
+void InvertIndex::cleanup_node(HashTable<uint64_t, void *>::node_t *node, void *arg)
+{
+    InvertIndex *ptr = (InvertIndex *)arg;
+    if (NULL == ptr)
+    {
+        FATAL("should not run to here");
+        ::abort();
+    }
+    if (node->value)
+    {
+        ::free(node->value);
+    }
+}
+
+void InvertIndex::cleanup_diff_node(HashTable<uint64_t, IDList *>::node_t *node, void *arg)
+{
+    InvertIndex *ptr = (InvertIndex *)arg;
+    if (NULL == ptr)
+    {
+        FATAL("should not run to here");
+        ::abort();
+    }
+    if (node->value)
+    {
+        ptr->m_list_pool.free(node->value);
+    }
+}
