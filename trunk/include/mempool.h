@@ -19,6 +19,7 @@
 
 #include <stdlib.h>
 #include <new>
+#include <vector>
 
 class MemoryPool
 {
@@ -41,25 +42,19 @@ class MemoryPool
             this->destroy();
         }
 
-        int init(size_t elem_size, size_t block_size, size_t pool_size)
+        int init(size_t elem_size, size_t block_size)
         {
             this->destroy();
-            if (0 == elem_size || 0 ==  block_size || 0 == pool_size)
+            if (0 == elem_size || 0 ==  block_size)
             {
                 return -1;
             }
             m_elem_size = (elem_size + sizeof(void *) - 1)/sizeof(void *)*sizeof(void *);
-            if (m_elem_size > block_size || block_size > pool_size)
+            if (m_elem_size > block_size)
             {
                 return -2;
             }
             m_block_size = block_size;
-            m_max_blocks_num = (pool_size + block_size - 1)/block_size;
-            m_blocks = (void **)::malloc(sizeof(void *) * m_max_blocks_num);
-            if (NULL == m_blocks)
-            {
-                return -3;
-            }
             return 0;
         }
 
@@ -70,18 +65,23 @@ class MemoryPool
                 void *ptr = (void *)m_free_list;
                 m_free_list = m_free_list->next;
                 ++m_alloc_num;
+                --m_free_num;
                 return ptr;
-            }
-            if (m_cur_blocks_num >= m_max_blocks_num)
-            {
-                return NULL;
             }
             void *block = ::malloc(m_block_size);
             if (NULL == block)
             {
                 return NULL;
             }
-            m_blocks[m_cur_blocks_num++] = block;
+            try
+            {
+                m_blocks.push_back(block);
+            }
+            catch (...)
+            {
+                ::free(block);
+                return NULL;
+            }
             const int num = m_block_size / m_elem_size;
             for (int i = 0; i < num; ++i)
             {
@@ -89,6 +89,7 @@ class MemoryPool
                 elem->next = m_free_list;
                 m_free_list = elem;
             }
+            m_free_num += num;
             return this->alloc();
         }
 
@@ -105,8 +106,6 @@ class MemoryPool
             ++m_free_num;
         }
 
-        size_t cur_blocks_num() const { return m_cur_blocks_num; }
-        size_t max_blocks_num() const { return m_max_blocks_num; }
         size_t block_size() const { return m_block_size; }
         size_t elem_size() const { return m_elem_size; }
         size_t alloc_num() const { return m_alloc_num; }
@@ -114,15 +113,12 @@ class MemoryPool
 
         size_t mem() const
         {
-            return sizeof(void *) * m_max_blocks_num
-                + m_cur_blocks_num * m_block_size;
+            return (sizeof(void *) + m_block_size) * m_blocks.size();
         }
     private:
         void clear()
         {
-            m_blocks = NULL;
-            m_cur_blocks_num = 0;
-            m_max_blocks_num = 0;
+            m_blocks.clear();
             m_block_size = 0;
             m_elem_size = 0;
             m_alloc_num = 0;
@@ -132,20 +128,14 @@ class MemoryPool
 
         void destroy()
         {
-            if (m_blocks)
+            for (size_t i = 0; i < m_blocks.size(); ++i)
             {
-                for (size_t i = 0; i < m_cur_blocks_num; ++i)
-                {
-                    ::free(m_blocks[i]);
-                }
-                ::free(m_blocks);
+                ::free(m_blocks[i]);
             }
             this->clear();
         }
     private:
-        void **m_blocks;
-        size_t m_cur_blocks_num;
-        size_t m_max_blocks_num;
+        std::vector<void *> m_blocks;
         size_t m_block_size;
         size_t m_elem_size;
 
@@ -185,15 +175,14 @@ class DelayPool
             m_delayed_list.head = m_delayed_list.tail = NULL;
         }
 
-        int init(size_t elem_size, size_t block_size, size_t pool_size)
+        int init(size_t elem_size, size_t block_size)
         {
-            int ret = m_pool.init(elem_size, block_size, pool_size);
+            int ret = m_pool.init(elem_size, block_size);
             if (ret < 0)
             {
                 return ret;
             }
-            int total = m_pool.block_size() / m_pool.elem_size() * m_pool.max_blocks_num();
-            ret = m_list_pool.init(sizeof(node_t), 1024*1024, total * (sizeof(void *) + sizeof(node_t)));
+            ret = m_list_pool.init(sizeof(node_t), 1024*1024);
             if (ret < 0)
             {
                 return ret;
@@ -275,8 +264,6 @@ class DelayPool
             }
         }
 
-        size_t cur_blocks_num() const { return m_pool.cur_blocks_num(); }
-        size_t max_blocks_num() const { return m_pool.max_blocks_num(); }
         size_t block_size() const { return m_pool.block_size(); }
         size_t elem_size() const { return m_pool.elem_size(); }
         size_t alloc_num() const { return m_pool.alloc_num(); }
@@ -320,9 +307,9 @@ class ObjectPool
         ObjectPool() { }
         ~ObjectPool() { }
 
-        int init(size_t block_size, size_t pool_size)
+        int init(size_t block_size)
         {
-            return m_pool.init(sizeof(T), block_size, pool_size);
+            return m_pool.init(sizeof(T), block_size);
         }
 
         T *alloc()
@@ -403,8 +390,6 @@ class ObjectPool
         {
             m_pool.set_delayed_time(delayed_seconds);
         }
-        size_t cur_blocks_num() const { return m_pool.cur_blocks_num(); }
-        size_t max_blocks_num() const { return m_pool.max_blocks_num(); }
         size_t block_size() const { return m_pool.block_size(); }
         size_t elem_size() const { return m_pool.elem_size(); }
         size_t alloc_num() const { return m_pool.alloc_num(); }

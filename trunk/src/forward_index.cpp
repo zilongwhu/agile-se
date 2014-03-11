@@ -217,15 +217,7 @@ int ForwardIndex::init(const char *path, const char *file)
         WARNING("failed to get mem_page_size");
         goto FAIL;
     }
-    int mem_pool_size;
-    if (!config.get("mem_pool_size", mem_pool_size) || mem_pool_size <= 0)
-    {
-        WARNING("failed to get mem_pool_size");
-        goto FAIL;
-    }
-    if (m_pool.init(m_info_size,
-                mem_page_size*1024L*1024L,
-                mem_pool_size*1024L*1024L) < 0)
+    if (m_pool.init(m_info_size, mem_page_size*1024L*1024L) < 0)
     {
         WARNING("failed to init mempool");
         goto FAIL;
@@ -236,13 +228,7 @@ int ForwardIndex::init(const char *path, const char *file)
         WARNING("failed to get node_page_size");
         goto FAIL;
     }
-    int node_pool_size;
-    if (!config.get("node_pool_size", node_pool_size) || node_pool_size <= 0)
-    {
-        WARNING("failed to get node_pool_size");
-        goto FAIL;
-    }
-    if (m_node_pool.init(node_page_size*1024L*1024L, node_pool_size*1024L*1024L) < 0)
+    if (m_node_pool.init(node_page_size*1024L*1024L) < 0)
     {
         WARNING("failed to init nodepool");
         goto FAIL;
@@ -271,8 +257,7 @@ int ForwardIndex::init(const char *path, const char *file)
             ++it;
         }
     }
-    WARNING("mempool[%d M, %d M], nodepool[%d M, %d M], bucket size[%d]",
-            mem_page_size, mem_pool_size, node_page_size, node_pool_size, bucket_size);
+    WARNING("mempool[%d M], nodepool[%d M], bucket size[%d]", mem_page_size, node_page_size, bucket_size);
     return 0;
 FAIL:
     __gnu_cxx::hash_map<std::string, FieldDes>::iterator it = m_fields.begin();
