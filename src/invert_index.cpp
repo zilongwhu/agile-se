@@ -431,13 +431,7 @@ int InvertIndex::init(const char *path, const char *file)
         WARNING("failed to get node_page_size");
         return -1;
     }
-    int node_pool_size;
-    if (!config.get("node_pool_size", node_pool_size) || node_pool_size <= 0)
-    {
-        WARNING("failed to get node_pool_size");
-        return -1;
-    }
-    if (m_node_pool.init(node_page_size*1024L*1024L, node_pool_size*1024L*1024L) < 0)
+    if (m_node_pool.init(node_page_size*1024L*1024L) < 0)
     {
         WARNING("failed to init node_pool");
         return -1;
@@ -448,13 +442,7 @@ int InvertIndex::init(const char *path, const char *file)
         WARNING("failed to get diff_node_page_size");
         return -1;
     }
-    int diff_node_pool_size;
-    if (!config.get("diff_node_pool_size", diff_node_pool_size) || diff_node_pool_size <= 0)
-    {
-        WARNING("failed to get diff_node_pool_size");
-        return -1;
-    }
-    if (m_diff_node_pool.init(diff_node_page_size*1024L*1024L, diff_node_pool_size*1024L*1024L) < 0)
+    if (m_diff_node_pool.init(diff_node_page_size*1024L*1024L) < 0)
     {
         WARNING("failed to init diff_node_pool");
         return -1;
@@ -465,13 +453,7 @@ int InvertIndex::init(const char *path, const char *file)
         WARNING("failed to get list_page_size");
         return -1;
     }
-    int list_pool_size;
-    if (!config.get("list_pool_size", list_pool_size) || list_pool_size <= 0)
-    {
-        WARNING("failed to get list_pool_size");
-        return -1;
-    }
-    if (m_list_pool.init(list_page_size*1024L*1024L, list_pool_size*1024L*1024L) < 0)
+    if (m_list_pool.init(list_page_size*1024L*1024L) < 0)
     {
         WARNING("failed to init list_pool");
         return -1;
@@ -480,12 +462,6 @@ int InvertIndex::init(const char *path, const char *file)
     if (!config.get("list_node_page_size", list_node_page_size) || list_node_page_size <= 0)
     {
         WARNING("failed to get list_node_page_size");
-        return -1;
-    }
-    int list_node_pool_size;
-    if (!config.get("list_node_pool_size", list_node_pool_size) || list_node_pool_size <= 0)
-    {
-        WARNING("failed to get list_node_pool_size");
         return -1;
     }
     for (size_t i = 0; i < sizeof(m_types.types)/sizeof(m_types.types[0]); ++i)
@@ -504,8 +480,7 @@ int InvertIndex::init(const char *path, const char *file)
             WARNING("failed to new list_pools");
             return -1;
         }
-        if (it->second->init(IDList::element_size(it->first),
-                    list_node_page_size*1024L*1024L, list_node_pool_size*1024L*1024L) < 0)
+        if (it->second->init(IDList::element_size(it->first), list_node_page_size*1024L*1024L) < 0)
         {
             WARNING("failed to init list_pools");
             return -1;
