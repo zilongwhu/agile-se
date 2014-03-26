@@ -79,7 +79,7 @@ int infix2postfix(const std::string &query, std::vector<std::string> &result)
                 {
                     ++i;
                 }
-                break;
+		else break;
             }
             result.push_back(std::string(buffer + start, i - start));
             TRACE("get token[%s]", result[result.size() - 1].c_str());
