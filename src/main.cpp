@@ -160,14 +160,36 @@ int main(int argc, char *argv[])
 //        std::cout << np.delayed_num() << std::endl;
 //    }
 
-    ForwardIndex idx;
-    idx.init("./conf", "fields.conf");
-    idx.update(1, "abc", "1");
-
-    InvertIndex invert;
-    InvertTypes types;
-    types.get_sign("abc", 0);
+//    ForwardIndex idx;
+//    idx.init("./conf", "fields.conf");
+//    idx.update(1, "abc", "1");
+//
+//    InvertIndex invert;
+//    InvertTypes types;
+//    types.get_sign("abc", 0);
 
     VMemoryPool vp;
+    vp.register_item(8, 4096);
+    vp.register_item(4, 4096);
+    vp.init(1024);
+
+    uint32_t pi = vp.alloc(4);
+    uint32_t pd = vp.alloc(8);
+
+    *(int *)vp.addr(pi) = 1024;
+    *(double *)vp.addr(pd) = 4096;
+
+    std::cout << pi << ":" << *(int *)vp.addr(pi) << std::endl;
+    std::cout << pd << ":" << *(double *)vp.addr(pd) << std::endl;
+
+    vp.free(pi);
+    vp.free(pd);
+
+    pi = vp.alloc(4);
+    pd = vp.alloc(8);
+
+    std::cout << pi << ":" << *(int *)vp.addr(pi) << std::endl;
+    std::cout << pd << ":" << *(double *)vp.addr(pd) << std::endl;
+
     return 0;
 }

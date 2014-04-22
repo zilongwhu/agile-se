@@ -19,6 +19,7 @@
 
 #include <vector>
 #include <utility>
+#include "log.h"
 
 class BitsSpliter
 {
@@ -73,7 +74,7 @@ class VMemoryPool
 
         int register_item(uint32_t elem_size, uint32_t page_size)
         {
-            if (elem_size <= sizeof(vaddr_t) || page_size <= 0 || elem_size > page_size)
+            if (elem_size < sizeof(vaddr_t) || page_size <= 0 || elem_size > page_size)
             {
                 return -1;
             }
@@ -86,6 +87,7 @@ class VMemoryPool
                 }
             }
             m_registered_items.push_back(std::make_pair(elem_size, page_size));
+            DEBUG("register item: elem_size=%u, page_size=%u", elem_size, page_size);
             return 0;
         }
 
@@ -101,8 +103,15 @@ class VMemoryPool
             uint32_t first = 32 - second;
             m_bits.init(first, second);
 
+            DEBUG("m_bits: index_num=%u, offset_num=%u, index_mask=%u, offset_mask=%u",
+                    m_bits.index_num(), m_bits.offset_num(),
+                    m_bits.index_mask(), m_bits.offset_mask());
+
             m_blocks.reserve((1u << m_bits.index_num()));
             m_slabs.resize(m_registered_items.size());
+
+            DEBUG("m_blocks: size=%u", (uint32_t)m_blocks.size());
+            DEBUG("m_slabs: size=%u", (uint32_t)m_slabs.size());
 
             uint32_t total = m_bits.offset_num();
             for (size_t i = 0; i < m_registered_items.size(); ++i)
@@ -127,6 +136,15 @@ class VMemoryPool
                 m_slabs[i].meta.slab_index = i;
                 m_slabs[i].freelist = 0;
                 m_slabs[i].cur_block_no = uint32_max;
+
+                DEBUG("m_slabs[%d]:", int(i));
+                DEBUG("    elem_size: %u", elem_size);
+                DEBUG("    page_size: %u", page_size);
+                DEBUG("    bits: index_num=%u, offset_num=%u, index_mask=%u, offset_mask=%u",
+                        m_slabs[i].meta.bits.index_num(),
+                        m_slabs[i].meta.bits.offset_num(),
+                        m_slabs[i].meta.bits.index_mask(),
+                        m_slabs[i].meta.bits.offset_mask());
             }
             return 0;
         }
