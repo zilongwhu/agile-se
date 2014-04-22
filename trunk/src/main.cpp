@@ -22,6 +22,7 @@
 #include "forward_index.h"
 #include "invert_index.h"
 #include "invert_type.h"
+#include "mempool2.h"
 
 struct A
 {
@@ -166,5 +167,7 @@ int main(int argc, char *argv[])
     InvertIndex invert;
     InvertTypes types;
     types.get_sign("abc", 0);
+
+    VMemoryPool vp;
     return 0;
 }
