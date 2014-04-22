@@ -95,6 +95,8 @@ class VMemoryPool
             {
                 return -1;
             }
+            this->clear();
+
             uint32_t second = log2(max_items_num);
             uint32_t first = 32 - second;
             m_bits.init(first, second);
@@ -261,7 +263,7 @@ class VMemoryPool
                 }
                 ::free(m_blocks[i].pages);
             }
-            m_blocks.clear();
+            m_blocks.resize(0);
             for (size_t i = 0; i < m_slabs.size(); ++i)
             {
                 m_slabs[i].freelist = 0;
