@@ -99,7 +99,7 @@ class VMemoryPool
             }
             this->clear();
 
-            uint32_t second = log2(max_items_num);
+            uint32_t second = log2(max_items_num - 1);
             uint32_t first = 32 - second;
             m_bits.init(first, second);
 
@@ -120,7 +120,7 @@ class VMemoryPool
                 uint32_t page_size = m_registered_items[i].second;
                 uint32_t elems_num = page_size / elem_size;
 
-                second = log2(elems_num);
+                second = log2(elems_num - 1);
                 if (second > total)
                 {
                     second = total;
