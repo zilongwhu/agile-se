@@ -110,7 +110,7 @@ class VMemoryPool
             m_blocks.reserve((1u << m_bits.index_num()));
             m_slabs.resize(m_registered_items.size());
 
-            DEBUG("m_blocks: size=%u", (uint32_t)m_blocks.size());
+            DEBUG("m_blocks: capacity=%u", (uint32_t)m_blocks.capacity());
             DEBUG("m_slabs: size=%u", (uint32_t)m_slabs.size());
 
             uint32_t total = m_bits.offset_num();
@@ -136,6 +136,7 @@ class VMemoryPool
                 m_slabs[i].meta.slab_index = i;
                 m_slabs[i].freelist = 0;
                 m_slabs[i].cur_block_no = uint32_max;
+                m_slabs[i].block_num = 0;
 
                 DEBUG("m_slabs[%d]:", int(i));
                 DEBUG("    elem_size: %u", elem_size);
@@ -162,6 +163,7 @@ class VMemoryPool
             }
             if (NULL == p_slab)
             {
+                WARNING("unregistered elem size: %u", elem_size);
                 return 0;
             }
             if (p_slab->cur_block_no == uint32_max)
@@ -176,22 +178,23 @@ class VMemoryPool
             {
                 void *ptr = this->addr(ret);
                 p_slab->freelist = *(uint32_t *)ptr;
+                DEBUG("reuse from freelist ok, addr=%u, elem size: %u", ret, elem_size);
             }
             else
             {
                 Block *p_block = &m_blocks[p_slab->cur_block_no];
                 if (p_block->slab.offset >= (1u << m_bits.offset_num())) /* block is full */
                 {
-                    uint32_t block_no;
-                    if (!this->alloc_one_block(block_no, p_slab->meta))
+                    if (!this->alloc_one_block(p_slab->cur_block_no, p_slab->meta))
                     { /* failed to alloc a new block */
                         return 0;
                     }
-                    p_slab->cur_block_no = block_no; /* update current block no */
                     p_block = &m_blocks[p_slab->cur_block_no];
                 }
                 if (p_block->cur_elem_no >= (1u << p_block->slab.meta.bits.offset_num())) /* page is full */
                 {
+                    DEBUG("current page is full, cur_elem_no=%u, cur_page_no=%u, cur_block_no=%u",
+                            p_block->cur_elem_no, p_block->cur_page_no, p_slab->cur_block_no);
                     p_block->cur_elem_no = 0;
                     ++p_block->cur_page_no;
                 }
@@ -200,14 +203,21 @@ class VMemoryPool
                     p_block->pages[p_block->cur_page_no] = ::malloc(p_block->slab.meta.page_size);
                     if (NULL == p_block->pages[p_block->cur_page_no])
                     { /* failed to alloc a new page */
+                        WARNING("failed to alloc a page, page_size=%u, cur_elem_no=%u, cur_page_no=%u, cur_block_no=%u",
+                                p_block->slab.meta.page_size, p_block->cur_elem_no, p_block->cur_page_no, p_slab->cur_block_no);
                         return 0;
                     }
+                    WARNING("alloc a new page, page_size=%u, cur_elem_no=%u, cur_page_no=%u, cur_block_no=%u",
+                            p_block->slab.meta.page_size, p_block->cur_elem_no, p_block->cur_page_no, p_slab->cur_block_no);
                 }
                 ret = ((p_slab->cur_block_no << m_bits.offset_num())
                         | ((p_block->cur_page_no) << p_slab->meta.bits.offset_num())
                         | (p_block->cur_elem_no)) + 1;
                 ++p_block->cur_elem_no;
                 ++p_block->slab.offset;
+
+                DEBUG("alloc ok, addr=%u, elem size: %u, page_size=%u, cur_elem_no=%u, cur_page_no=%u, offset=%u, cur_block_no=%u",
+                        ret, elem_size, p_block->slab.meta.page_size, p_block->cur_elem_no, p_block->cur_page_no, p_block->slab.offset, p_slab->cur_block_no);
             }
             return ret;
         }
@@ -216,11 +226,13 @@ class VMemoryPool
         {
             if (0 == ptr)
             {
+                WARNING("invalid address");
                 return ;
             }
             uint32_t block_no = (((ptr - 1) & m_bits.index_mask()) >> m_bits.offset_num());
             if (block_no > m_blocks.size())
             {
+                WARNING("invalid block_no=%u, block size=%u", block_no, (uint32_t)m_blocks.size());
                 return ;
             }
             Block *p_block = &m_blocks[block_no];
@@ -228,10 +240,12 @@ class VMemoryPool
             uint32_t elem_no = ((ptr - 1) & p_block->slab.meta.bits.offset_mask());
             if (!p_block->pages)
             {
+                WARNING("pages is NULL,  block_no=%u", block_no);
                 return ;
             }
             if (!p_block->pages[page_no])
             {
+                WARNING("page is NULL, page_no=%u, block_no=%u", page_no, block_no);
                 return ;
             }
             void *real = ((char *)p_block->pages[page_no]) + elem_no * p_block->slab.meta.elem_size;
@@ -243,11 +257,13 @@ class VMemoryPool
         {
             if (0 == ptr)
             {
+                WARNING("invalid address");
                 return NULL;
             }
             uint32_t block_no = (((ptr - 1) & m_bits.index_mask()) >> m_bits.offset_num());
             if (block_no > m_blocks.size())
             {
+                WARNING("invalid block_no=%u, block size=%u", block_no, (uint32_t)m_blocks.size());
                 return NULL;
             }
             Block *p_block = &m_blocks[block_no];
@@ -255,10 +271,12 @@ class VMemoryPool
             uint32_t elem_no = ((ptr - 1) & p_block->slab.meta.bits.offset_mask());
             if (!p_block->pages)
             {
+                WARNING("pages is NULL,  block_no=%u", block_no);
                 return NULL;
             }
             if (!p_block->pages[page_no])
             {
+                WARNING("page is NULL, page_no=%u, block_no=%u", page_no, block_no);
                 return NULL;
             }
             return ((char *)p_block->pages[page_no]) + elem_no * p_block->slab.meta.elem_size;
@@ -286,6 +304,7 @@ class VMemoryPool
             {
                 m_slabs[i].freelist = 0;
                 m_slabs[i].cur_block_no = uint32_max;
+                m_slabs[i].block_num = 0;
             }
         }
     private:
@@ -302,6 +321,7 @@ class VMemoryPool
             SlabMeta meta;
             vaddr_t freelist;
             uint32_t cur_block_no;
+            uint32_t block_num;
         };
         struct Block
         {
@@ -320,12 +340,16 @@ class VMemoryPool
         {
             if (m_blocks.size() >= (1u << m_bits.index_num()))
             {
+                WARNING("too many blocks, block num=%u, index num=%u",
+                        (uint32_t)m_blocks.size(), m_bits.index_num());
                 return false;
             }
             uint32_t page_num = (1u << meta.bits.index_num());
             void **pages = (void **)::calloc(page_num, sizeof(void *));
             if (NULL == pages)
             {
+                WARNING("failed to calloc pages array, page_num=%u, elem_size=%u, page_size=%u",
+                        page_num, meta.elem_size, meta.page_size);
                 return false;
             }
             block_no = m_blocks.size();
@@ -336,6 +360,11 @@ class VMemoryPool
             m_blocks[block_no].cur_page_no = 0;
             m_blocks[block_no].cur_elem_no = 0;
             m_blocks[block_no].pages = pages;
+
+            ++m_slabs[meta.slab_index].block_num;
+
+            DEBUG("alloc block: id=%u, block_num=%u, page_num=%u, elem_size=%u, page_size=%u",
+                    block_no, m_slabs[meta.slab_index].block_num, page_num, meta.elem_size, meta.page_size);
             return true;
         }
     private:
