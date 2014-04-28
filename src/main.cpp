@@ -16,6 +16,7 @@
 
 #include <iostream>
 #include "mempool.h"
+#include "multi_mempool.h"
 #include "sortlist.h"
 #include "idlist.h"
 #include "hashtable.h"
@@ -23,6 +24,8 @@
 #include "invert_index.h"
 #include "invert_type.h"
 #include "mempool2.h"
+#include "delaypool.h"
+#include "objectpool.h"
 
 struct A
 {
@@ -190,6 +193,19 @@ int main(int argc, char *argv[])
 
     std::cout << pi << ":" << *(int *)vp.addr(pi) << std::endl;
     std::cout << pd << ":" << *(double *)vp.addr(pd) << std::endl;
+
+    MultiMemoryPool mm;
+    TDelayPool<MultiMemoryPool> dp1;
+    TDelayPool<VMemoryPool> dp2;
+
+    dp2.register_item(sizeof(int), 0);
+    dp2.register_item(sizeof(double), 0);
+
+    TObjectPool<int, VMemoryPool> ip;
+    TObjectPool<double, VMemoryPool> dp;
+
+    ip.init(&dp2);
+    dp.init(&dp2);
 
     return 0;
 }

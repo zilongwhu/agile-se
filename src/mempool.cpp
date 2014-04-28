@@ -18,6 +18,10 @@
 #include <unistd.h>
 #include <pthread.h>
 #include "mempool.h"
+#include "multi_mempool.h"
+
+const MemoryPool::vaddr_t MemoryPool::null = NULL;
+const MultiMemoryPool::vaddr_t MultiMemoryPool::null = NULL;
 
 volatile int DelayPool::s_now;
 

@@ -153,12 +153,7 @@ class VMemoryPool
             return 0;
         }
 
-        int init(const char *path, const char *file)
-        {
-            return 0;
-        }
-
-        vaddr_t alloc(size_t elem_size)
+        vaddr_t alloc(uint32_t elem_size)
         {
             Slab *p_slab = NULL;
             {
@@ -239,7 +234,7 @@ class VMemoryPool
             return ret;
         }
 
-        void free(vaddr_t ptr)
+        void free(vaddr_t ptr, uint32_t elem_size = 0)
         {
             void *real = this->addr(ptr);
             if (NULL != real)
@@ -252,7 +247,7 @@ class VMemoryPool
             }
         }
 
-        void *addr(vaddr_t ptr)
+        void *addr(vaddr_t ptr) const
         {
             if (null == ptr)
             {
