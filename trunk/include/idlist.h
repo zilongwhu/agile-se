@@ -84,7 +84,7 @@ class TIDList
         TIDList(const TIDList &);
         TIDList &operator =(const TIDList &);
     public:
-        TIDList(DelayPool *pool, size_t payload_len)
+        TIDList(DelayPool *pool, uint32_t payload_len)
         {
             m_pool = pool;
             m_payload_len = payload_len;
@@ -109,8 +109,8 @@ class TIDList
             m_size = 0;
         }
 
-        size_t payload_len() const { return m_payload_len; }
-        size_t size() const { return m_size; }
+        uint32_t payload_len() const { return m_payload_len; }
+        uint32_t size() const { return m_size; }
 
         iterator begin() const
         {
@@ -237,17 +237,17 @@ class TIDList
             }
         }
     public:
-        static size_t element_size(size_t payload_len)
+        static uint32_t element_size(uint32_t payload_len)
         {
             return payload_len + sizeof(int) + sizeof(vaddr_t);
         }
     private:
         DelayPool *m_pool;
-        size_t m_payload_len;
-        size_t m_element_size;
+        uint32_t m_payload_len;
+        uint32_t m_element_size;
 
         vaddr_t m_head;
-        size_t m_size;
+        uint32_t m_size;
 };
 
 #endif

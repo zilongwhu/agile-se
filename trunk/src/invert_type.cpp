@@ -95,11 +95,11 @@ int InvertTypes::init(const char *path, const char *file)
             WARNING("unsupported invert parser[%s]", parser.c_str());
             goto FAIL;
         }
-        types[i].type = type;
-        types[i].payload_len = length;
-        types[i].page_size = page_size;
-        ::snprintf(types[i].prefix, sizeof(types[i].prefix), "%s", prefix.c_str());
-        types[i].parser = (*it->second)();
+        types[type].type = type;
+        types[type].payload_len = length;
+        types[type].page_size = page_size;
+        ::snprintf(types[type].prefix, sizeof(types[type].prefix), "%s", prefix.c_str());
+        types[type].parser = (*it->second)();
     }
     return 0;
 FAIL:
