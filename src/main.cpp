@@ -163,13 +163,13 @@ int main(int argc, char *argv[])
 //        std::cout << np.delayed_num() << std::endl;
 //    }
 
-//    ForwardIndex idx;
-//    idx.init("./conf", "fields.conf");
-//    idx.update(1, "abc", "1");
-//
-//    InvertIndex invert;
-//    InvertTypes types;
-//    types.get_sign("abc", 0);
+    ForwardIndex idx;
+    idx.init("./conf", "fields.conf");
+    idx.update(1, "abc", "1");
+
+    InvertIndex invert;
+    InvertTypes types;
+    types.get_sign("abc", 0);
 
     VMemoryPool vp;
     vp.register_item(8, 4096);
