@@ -25,8 +25,8 @@
 #include "mempool2.h"
 #include "delaypool.h"
 #include "objectpool.h"
-#include "field_parser.h"
 #include "hashtable.h"
+#include "field_parser.h"
 
 class ForwardIndex
 {

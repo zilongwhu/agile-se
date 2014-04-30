@@ -17,13 +17,15 @@
 #ifndef __AGILE_SE_MULTI_MEMORY_POOL_H__
 #define __AGILE_SE_MULTI_MEMORY_POOL_H__
 
-#include <map>
+#include <ext/hash_map>
 #include "mempool.h"
 
 class MultiMemoryPool
 {
     public:
         typedef MemoryPool::vaddr_t vaddr_t;
+    private:
+        typedef __gnu_cxx::hash_map<uint32_t, MemoryPool *> Map;
     private:
         MultiMemoryPool(const MultiMemoryPool &);
         MultiMemoryPool &operator =(const MultiMemoryPool &);
@@ -35,8 +37,8 @@ class MultiMemoryPool
 
         ~MultiMemoryPool()
         {
-            std::map<uint32_t, MemoryPool *>::iterator it = m_pools.begin();
-            while (it != m_pools.end())
+            Map::iterator it = m_pools.begin();
+            while (it != m_pools_end)
             {
                 if (it->second)
                 {
@@ -55,7 +57,7 @@ class MultiMemoryPool
                 WARNING("invalid args: elem_size=%u", elem_size);
                 return -1;
             }
-            m_pools.insert(std::make_pair(elem_size, (MemoryPool *)NULL));
+            m_pools[elem_size] = NULL;
             WARNING("register item: elem_size=%u", elem_size);
             return 0;
         }
@@ -67,8 +69,9 @@ class MultiMemoryPool
                 WARNING("invalid args: max_items_num=%u", max_items_num);
                 return -1;
             }
-            std::map<uint32_t, MemoryPool *>::iterator it = m_pools.begin();
-            while (it != m_pools.end())
+            m_pools_end = m_pools.end();
+            Map::iterator it = m_pools.begin();
+            while (it != m_pools_end)
             {
                 if (NULL == it->second)
                 {
@@ -92,8 +95,8 @@ class MultiMemoryPool
 
         vaddr_t alloc(uint32_t elem_size)
         {
-            std::map<uint32_t, MemoryPool *>::iterator it = m_pools.find(elem_size);
-            if (it == m_pools.end())
+            Map::iterator it = m_pools.find(elem_size);
+            if (it == m_pools_end)
             {
                 WARNING("unregistered elem size: %u", elem_size);
                 return NULL;
@@ -112,8 +115,8 @@ class MultiMemoryPool
             {
                 return ;
             }
-            std::map<uint32_t, MemoryPool *>::iterator it = m_pools.find(elem_size);
-            if (it == m_pools.end())
+            Map::iterator it = m_pools.find(elem_size);
+            if (it == m_pools_end)
             {
                 WARNING("unregistered elem size: %u", elem_size);
                 return ;
@@ -130,8 +133,8 @@ class MultiMemoryPool
 
         void clear()
         {
-            std::map<uint32_t, MemoryPool *>::iterator it = m_pools.begin();
-            while (it != m_pools.end())
+            Map::iterator it = m_pools.begin();
+            while (it != m_pools_end)
             {
                 if (it->second)
                 {
@@ -141,7 +144,8 @@ class MultiMemoryPool
             }
         }
     private:
-        std::map<uint32_t, MemoryPool *> m_pools;
+        Map m_pools;
+        Map::iterator m_pools_end;
         uint32_t m_max_items_num;
 };
 
