@@ -54,7 +54,6 @@ class VMemoryPool
 {
     public:
         typedef uint32_t vaddr_t;
-        const static vaddr_t null = 0;
     private:
         const static uint32_t uint32_max = (4294967295U);
     private:
@@ -161,12 +160,12 @@ class VMemoryPool
                 if (it == m_size2off.end())
                 {
                     WARNING("unregistered elem size: %u", elem_size);
-                    return null;
+                    return 0;
                 }
                 if (it->second >= m_slabs.size())
                 {
                     WARNING("internal error");
-                    return null;
+                    return 0;
                 }
                 p_slab = &m_slabs[it->second];
             }
@@ -175,7 +174,7 @@ class VMemoryPool
                 if (!this->alloc_one_block(p_slab->cur_block_no, p_slab->meta))
                 {
                     WARNING("failed to alloc new block, elem_size=%u", elem_size);
-                    return null;
+                    return 0;
                 }
             }
             vaddr_t ret = p_slab->freelist;
@@ -197,7 +196,7 @@ class VMemoryPool
                     if (!this->alloc_one_block(p_slab->cur_block_no, p_slab->meta))
                     {
                         WARNING("failed to alloc new block, elem_size=%u", elem_size);
-                        return null;
+                        return 0;
                     }
                     p_block = &m_blocks[p_slab->cur_block_no];
                 }
@@ -219,7 +218,7 @@ class VMemoryPool
                     { /* failed to alloc a new page */
                         WARNING("failed to alloc a page, page_size=%u, cur_elem_no=%u, cur_page_no=%u, cur_block_no=%u",
                                 p_block->slab.meta.page_size, p_block->cur_elem_no, p_block->cur_page_no, p_slab->cur_block_no);
-                        return null;
+                        return 0;
                     }
                 }
                 ret = ((p_slab->cur_block_no << m_bits.offset_num())
@@ -249,7 +248,7 @@ class VMemoryPool
 
         void *addr(vaddr_t ptr) const
         {
-            if (null == ptr)
+            if (0 == ptr)
             {
                 WARNING("invalid address");
                 return NULL;

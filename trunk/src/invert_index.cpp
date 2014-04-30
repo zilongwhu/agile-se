@@ -151,10 +151,10 @@ class BigList: public DocList
 class AddList: public DocList
 {
     public:
-        typedef IDList::iterator Iterator;
+        typedef InvertIndex::IDList::iterator Iterator;
 
         AddList(uint64_t sign, uint8_t type, uint16_t payload_len, Iterator it)
-            : m_it(it), m_it_c(it), m_end(NULL)
+            : m_it(it), m_it_c(it), m_end(0, NULL)
         {
             m_sign = sign;
             m_type = type;
@@ -223,9 +223,9 @@ class AddList: public DocList
 class DeleteList: public DocList
 {
     public:
-        typedef IDList::iterator Iterator;
+        typedef InvertIndex::IDList::iterator Iterator;
 
-        DeleteList(Iterator it): m_it(it), m_it_c(it), m_end(NULL) { }
+        DeleteList(Iterator it): m_it(it), m_it_c(it), m_end(0, NULL) { }
 
         int32_t first()
         {
@@ -401,15 +401,6 @@ InvertIndex::~InvertIndex()
         delete m_del_dict;
         m_del_dict = NULL;
     }
-    __gnu_cxx::hash_map<size_t, DelayPool *>::iterator it = m_list_pools.begin();
-    while (it != m_list_pools.end())
-    {
-        if (it->second)
-        {
-            delete it->second;
-        }
-        ++it;
-    }
 }
 
 int InvertIndex::init(const char *path, const char *file)
@@ -425,111 +416,45 @@ int InvertIndex::init(const char *path, const char *file)
         WARNING("failed parse config[%s:%s]", path, file);
         return -1;
     }
-    int node_page_size;
-    if (!config.get("node_page_size", node_page_size) || node_page_size <= 0)
-    {
-        WARNING("failed to get node_page_size");
-        return -1;
-    }
-    if (m_node_pool.init(node_page_size*1024L*1024L) < 0)
-    {
-        WARNING("failed to init node_pool");
-        return -1;
-    }
-    int diff_node_page_size;
-    if (!config.get("diff_node_page_size", diff_node_page_size) || diff_node_page_size <= 0)
-    {
-        WARNING("failed to get diff_node_page_size");
-        return -1;
-    }
-    if (m_diff_node_pool.init(diff_node_page_size*1024L*1024L) < 0)
-    {
-        WARNING("failed to init diff_node_pool");
-        return -1;
-    }
-    int list_page_size;
-    if (!config.get("list_page_size", list_page_size) || list_page_size <= 0)
-    {
-        WARNING("failed to get list_page_size");
-        return -1;
-    }
-    if (m_list_pool.init(list_page_size*1024L*1024L) < 0)
-    {
-        WARNING("failed to init list_pool");
-        return -1;
-    }
-    int list_node_page_size;
-    if (!config.get("list_node_page_size", list_node_page_size) || list_node_page_size <= 0)
-    {
-        WARNING("failed to get list_node_page_size");
-        return -1;
-    }
-    for (size_t i = 0; i < sizeof(m_types.types)/sizeof(m_types.types[0]); ++i)
-    {
-        if (m_types.is_valid_type(i))
-        {
-            m_list_pools[m_types.types[i].payload_len] = NULL;
-        }
-    }
-    __gnu_cxx::hash_map<size_t, DelayPool *>::iterator it = m_list_pools.begin();
-    while (it != m_list_pools.end())
-    {
-        it->second = new DelayPool();
-        if (NULL == it->second)
-        {
-            WARNING("failed to new list_pools");
-            return -1;
-        }
-        if (it->second->init(IDList::element_size(it->first), list_node_page_size*1024L*1024L) < 0)
-        {
-            WARNING("failed to init list_pools");
-            return -1;
-        }
-        ++it;
-    }
-    for (size_t i = 0; i < sizeof(m_types.types)/sizeof(m_types.types[0]); ++i)
-    {
-        if (m_types.is_valid_type(i))
-        {
-            m_types.types[i].pool = m_list_pools[m_types.types[i].payload_len];
-        }
-    }
     int dict_hash_size;
     if (!config.get("dict_hash_size", dict_hash_size) || dict_hash_size <= 0)
     {
         WARNING("failed to get dict_hash_size");
         return -1;
     }
-    m_dict = new HashTable<uint64_t, void *>(&m_node_pool, dict_hash_size);
+    m_dict = new Hash(dict_hash_size);
     if (NULL == m_dict)
     {
         WARNING("failed to new m_dict");
         return -1;
     }
+    m_dict->set_pool(&m_node_pool);
     int add_dict_hash_size;
     if (!config.get("add_dict_hash_size", add_dict_hash_size) || add_dict_hash_size <= 0)
     {
         WARNING("failed to get add_dict_hash_size");
         return -1;
     }
-    m_add_dict = new HashTable<uint64_t, IDList *>(&m_diff_node_pool, add_dict_hash_size);
+    m_add_dict = new VHash(add_dict_hash_size);
     if (NULL == m_add_dict)
     {
         WARNING("failed to new m_add_dict");
         return -1;
     }
+    m_add_dict->set_pool(&m_vnode_pool);
     int del_dict_hash_size;
     if (!config.get("del_dict_hash_size", del_dict_hash_size) || del_dict_hash_size <= 0)
     {
         WARNING("failed to get del_dict_hash_size");
         return -1;
     }
-    m_del_dict = new HashTable<uint64_t, IDList *>(&m_diff_node_pool, del_dict_hash_size);
+    m_del_dict = new VHash(del_dict_hash_size);
     if (NULL == m_del_dict)
     {
         WARNING("failed to new m_del_dict");
         return -1;
     }
+    m_del_dict->set_pool(&m_vnode_pool);
     return 0;
 }
 
@@ -547,14 +472,20 @@ DocList *InvertIndex::trigger(const char *keystr, uint8_t type) const
 DocList *InvertIndex::trigger(uint64_t sign, uint8_t type) const
 {
     void **big = m_dict->find(sign);
-    IDList **add = m_add_dict->find(sign);
+    vaddr_t *vadd = m_add_dict->find(sign);
 
-    if (NULL == big && NULL == add)
+    if (NULL == big && NULL == vadd)
     {
         return NULL;
     }
+    IDList *add = m_list_pool.addr(*vadd);
+    IDList *del = NULL;
 
-    IDList **del = m_del_dict->find(sign);
+    vaddr_t *vdel = m_del_dict->find(sign);
+    if (NULL != vdel)
+    {
+        del = m_list_pool.addr(*vdel);
+    }
 
     BigList *bl = NULL;
     if (big)
@@ -570,7 +501,7 @@ DocList *InvertIndex::trigger(uint64_t sign, uint8_t type) const
     if (add)
     {
         al = new(std::nothrow) AddList(sign, type,
-                m_types.types[type].payload_len, (*add)->begin());
+                m_types.types[type].payload_len, add->begin());
         if (NULL == al)
         {
             WARNING("failed to new AddList");
@@ -584,7 +515,7 @@ DocList *InvertIndex::trigger(uint64_t sign, uint8_t type) const
     DeleteList *dl = NULL;
     if (del)
     {
-        dl = new(std::nothrow) DeleteList((*del)->begin());
+        dl = new(std::nothrow) DeleteList(del->begin());
         if (NULL == dl)
         {
             WARNING("failed to new DeleteList");
@@ -651,46 +582,57 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, cJSON 
 bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, void *payload)
 {
     uint64_t sign = m_types.get_sign(keystr, type);
-    IDList **del_list = m_del_dict->find(sign);
+    IDList *del_list = NULL;
+    vaddr_t *vdel_list = m_del_dict->find(sign);
+    if (vdel_list)
+    {
+        del_list = m_list_pool.addr(*vdel_list);
+    }
     if (del_list)
     {
-        (*del_list)->remove(docid);
-        if ((*del_list)->size() == 0)
+        del_list->remove(docid);
+        if (del_list->size() == 0)
         {
             m_del_dict->remove(sign);
         }
     }
     size_t payload_len = m_types.types[type].payload_len;
-    IDList **add_list = m_add_dict->find(sign);
+    IDList *add_list = NULL;
+    vaddr_t *vadd_list = m_add_dict->find(sign);
+    if (vadd_list)
+    {
+        add_list = m_list_pool.addr(*vadd_list);
+    }
     if (add_list)
     {
-        if ((*add_list)->payload_len() != payload_len)
+        if (add_list->payload_len() != payload_len)
         {
             WARNING("conflicting hash value[%s:%d]", keystr, int(type));
             return false;
         }
-        if (!(*add_list)->insert(docid, payload))
+        if (!add_list->insert(docid, payload))
         {
             WARNING("failed to insert docid[%d] for hash value[%s:%d]", docid, keystr, int(type));
             return false;
         }
-        if ((*add_list)->size() > 32)
+        if (add_list->size() > 32)
         {
             this->merge(sign, type);
         }
     }
     else
     {
-        IDList *tmp = m_list_pool.alloc(m_types.types[type].pool, payload_len);
+        vaddr_t vlist = m_list_pool.alloc(&m_pool, payload_len);
+        IDList *tmp = m_list_pool.addr(vlist);
         if (NULL == tmp)
         {
             WARNING("failed to alloc IDList");
             return false;
         }
         if (!tmp->insert(docid, payload)
-                || !m_add_dict->insert(sign, tmp))
+                || !m_add_dict->insert(sign, vlist))
         {
-            m_list_pool.free(tmp);
+            m_list_pool.free(vlist);
             WARNING("failed to insert docid[%d] for hash value[%s:%d]", docid, keystr, int(type));
             return false;
         }
@@ -701,40 +643,51 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, void *
 bool InvertIndex::reomve(const char *keystr, uint8_t type, int32_t docid)
 {
     uint64_t sign = m_types.get_sign(keystr, type);
-    IDList **add_list = m_add_dict->find(sign);
+    IDList *add_list = NULL;
+    vaddr_t *vadd_list = m_add_dict->find(sign);
+    if (vadd_list)
+    {
+        add_list = m_list_pool.addr(*vadd_list);
+    }
     if (add_list)
     {
-        (*add_list)->remove(docid);
-        if ((*add_list)->size() == 0)
+        add_list->remove(docid);
+        if (add_list->size() == 0)
         {
             m_add_dict->remove(sign);
         }
     }
-    IDList **del_list = m_del_dict->find(sign);
+    IDList *del_list = NULL;
+    vaddr_t *vdel_list = m_del_dict->find(sign);
+    if (vdel_list)
+    {
+        del_list = m_list_pool.addr(*vdel_list);
+    }
     if (del_list)
     {
-        if (!(*del_list)->insert(docid, NULL))
+        if (!del_list->insert(docid, NULL))
         {
             WARNING("failed to remove docid[%d] for hash value[%s:%d]", docid, keystr, int(type));
             return false;
         }
-        if ((*del_list)->size() > 32)
+        if (del_list->size() > 32)
         {
             this->merge(sign, type);
         }
     }
     else
     {
-        IDList *tmp = m_list_pool.alloc(m_types.types[type].pool, 0);
+        vaddr_t vlist = m_list_pool.alloc(&m_pool, 0);
+        IDList *tmp = m_list_pool.addr(vlist);
         if (NULL == tmp)
         {
             WARNING("failed to alloc IDList");
             return false;
         }
         if (!tmp->insert(docid, NULL)
-                || !m_del_dict->insert(sign, tmp))
+                || !m_del_dict->insert(sign, vlist))
         {
-            m_list_pool.free(tmp);
+            m_list_pool.free(vlist);
             WARNING("failed to remove docid[%d] for hash value[%s:%d]", docid, keystr, int(type));
             return false;
         }
@@ -804,7 +757,7 @@ void InvertIndex::merge(uint64_t sign, uint8_t type)
     }
 }
 
-void InvertIndex::cleanup_node(HashTable<uint64_t, void *>::node_t *node, void *arg)
+void InvertIndex::cleanup_node(Hash::node_t *node, intptr_t arg)
 {
     InvertIndex *ptr = (InvertIndex *)arg;
     if (NULL == ptr)
@@ -818,7 +771,7 @@ void InvertIndex::cleanup_node(HashTable<uint64_t, void *>::node_t *node, void *
     }
 }
 
-void InvertIndex::cleanup_diff_node(HashTable<uint64_t, IDList *>::node_t *node, void *arg)
+void InvertIndex::cleanup_diff_node(VHash::node_t *node, intptr_t arg)
 {
     InvertIndex *ptr = (InvertIndex *)arg;
     if (NULL == ptr)

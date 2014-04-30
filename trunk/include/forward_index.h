@@ -22,7 +22,9 @@
 #include <string>
 #include <utility>
 #include <ext/hash_map>
-#include "mempool.h"
+#include "mempool2.h"
+#include "delaypool.h"
+#include "objectpool.h"
 #include "field_parser.h"
 #include "hashtable.h"
 
@@ -38,6 +40,11 @@ class ForwardIndex
             int type; /* 0->int, 1->float, 2->void * */
             FieldParser *parser;
         };
+    private:
+        typedef TDelayPool<VMemoryPool> Pool;
+        typedef Pool::vaddr_t vaddr_t;
+        typedef HashTable<long, vaddr_t> Hash;
+        typedef Hash::ObjectPool NodePool;
     private:
         ForwardIndex(const ForwardIndex &);
         ForwardIndex &operator =(const ForwardIndex &);
@@ -64,12 +71,13 @@ class ForwardIndex
 
         void recycle()
         {
-            m_node_pool.recycle(cleanup, this);
+            m_pool.recycle();
         }
     private:
         struct cleanup_data_t
         {
             void *mem;
+            Pool::vaddr_t addr;
             std::vector<std::pair<int, FieldParser *> > fields_need_free;
 
             void clean()
@@ -89,12 +97,13 @@ class ForwardIndex
                 }
             }
         };
-        static void cleanup(HashTable<long, void *>::node_t *node, void *arg);
+        static void cleanup(Hash::node_t *node, intptr_t arg);
     private:
-        MemoryPool m_pool;
-        ObjectPool<HashTable<long, void *>::node_t> m_node_pool;
+        Pool m_pool;
+        NodePool m_node_pool;
 
-        HashTable<long, void *> *m_dict;
+        Hash *m_dict;
+
         __gnu_cxx::hash_map<std::string, FieldDes> m_fields;
         size_t m_info_size;
 

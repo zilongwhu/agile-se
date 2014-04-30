@@ -24,7 +24,6 @@ class MultiMemoryPool
 {
     public:
         typedef MemoryPool::vaddr_t vaddr_t;
-        const static vaddr_t null;
     private:
         MultiMemoryPool(const MultiMemoryPool &);
         MultiMemoryPool &operator =(const MultiMemoryPool &);
@@ -97,19 +96,19 @@ class MultiMemoryPool
             if (it == m_pools.end())
             {
                 WARNING("unregistered elem size: %u", elem_size);
-                return null;
+                return NULL;
             }
             if (NULL == it->second)
             {
                 WARNING("not init elem size: %u", elem_size);
-                return null;
+                return NULL;
             }
             return it->second->alloc();
         }
 
         void free(vaddr_t ptr, uint32_t elem_size)
         {
-            if (null == ptr)
+            if (NULL == ptr)
             {
                 return ;
             }
