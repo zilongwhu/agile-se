@@ -70,6 +70,7 @@ class InvertIndex
 
         DocList *parse(const std::string &query, const std::vector<term_t> terms) const;
         DocList *trigger(const char *keystr, uint8_t type) const;
+        bool get_signs_by_docid(int32_t docid, std::vector<uint64_t> &signs) const;
 
         bool insert(const char *keystr, uint8_t type, int32_t docid, const std::string &json);
         bool insert(const char *keystr, uint8_t type, int32_t docid, cJSON *json);
