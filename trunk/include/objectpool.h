@@ -23,6 +23,7 @@ template<typename T, typename TMemoryPool>
 class TObjectPool
 {
     public:
+        typedef T ObjectType;
         typedef TDelayPool<TMemoryPool> Pool;
         typedef typename Pool::vaddr_t vaddr_t;
 
@@ -46,7 +47,41 @@ class TObjectPool
 
         int init(Pool *pool)
         {
+            if (NULL != m_pool)
+            {
+                WARNING("ignore duplicate init call");
+                return -1;
+            }
             m_pool = pool;
+            if (NULL == m_pool)
+            {
+                m_pool = new Pool;
+                if (NULL == m_pool)
+                {
+                    WARNING("failed to new Pool");
+                    return -1;
+                }
+                if (init_pool(m_pool) < 0)
+                {
+                    WARNING("failed to register cleanup_bat_t");
+                }
+                else if (m_pool->register_item(sizeof(T), 1024*1024) < 0)
+                {
+                    WARNING("failed to register item");
+                }
+                else if (m_pool->init(1024*1024) < 0)
+                {
+                    WARNING("failed to init pool");
+                }
+                else
+                {
+                    WARNING("use private pool");
+                    return 0;
+                }
+                delete m_pool;
+                m_pool = NULL;
+                return -1;
+            }
             return 0;
         }
 
@@ -128,6 +163,10 @@ class TObjectPool
 
         int delay_free(vaddr_t ptr, cleanup_fun_t fun = NULL, intptr_t arg = 0)
         {
+            if (0 == ptr)
+            {
+                return -1;
+            }
             if (fun)
             {
                 vaddr_t bp = m_pool->alloc(sizeof(cleanup_bag_t));
@@ -174,7 +213,7 @@ class TObjectPool
             }
         }
     private:
-        TDelayPool<TMemoryPool> *m_pool;
+        Pool *m_pool;
 };
 
 #endif

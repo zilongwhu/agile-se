@@ -211,6 +211,11 @@ int ForwardIndex::init(const char *path, const char *file)
         m_fields.insert(std::make_pair(fields[i].name, fd));
     }
     m_info_size = max_size;
+    if (NodePool::init_pool(&m_pool) < 0)
+    {
+        WARNING("failed to call init_pool");
+        goto FAIL;
+    }
     int mem_page_size;
     if (!config.get("mem_page_size", mem_page_size) || mem_page_size <= 0)
     {
@@ -228,7 +233,7 @@ int ForwardIndex::init(const char *path, const char *file)
         WARNING("failed to get node_page_size");
         goto FAIL;
     }
-    if (m_pool.register_item(sizeof(Hash::node_t), node_page_size) < 0)
+    if (m_pool.register_item(sizeof(NodePool::ObjectType), node_page_size) < 0)
     {
         WARNING("failed to register node_size to mempool");
         goto FAIL;
@@ -244,6 +249,7 @@ int ForwardIndex::init(const char *path, const char *file)
         WARNING("failed to init mempool");
         goto FAIL;
     }
+    m_node_pool.init(&m_pool);
     int bucket_size;
     if (!config.get("bucket_size", bucket_size) || bucket_size <= 0)
     {
