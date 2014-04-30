@@ -416,6 +416,73 @@ int InvertIndex::init(const char *path, const char *file)
         WARNING("failed parse config[%s:%s]", path, file);
         return -1;
     }
+    if (NodePool::init_pool(&m_pool) < 0
+            || VNodePool::init_pool(&m_pool) < 0
+            || ListPool::init_pool(&m_pool) < 0)
+    {
+        WARNING("failed to call init_pool");
+        return -1;
+    }
+    for (int i = 0; i < 0xFF; ++i)
+    {
+        if (m_types.is_valid_type(i))
+        {
+            if (m_pool.register_item(IDList::element_size(
+                            m_types.types[i].payload_len),
+                        m_types.types[i].page_size) < 0)
+            {
+                WARNING("failed to register element size for invert type: %d", i);
+                return -1;
+            }
+        }
+    }
+    int node_page_size;
+    if (!config.get("node_page_size", node_page_size) || node_page_size <= 0)
+    {
+        WARNING("failed to get node_page_size");
+        return -1;
+    }
+    if (m_pool.register_item(sizeof(NodePool::ObjectType), node_page_size) < 0)
+    {
+        WARNING("failed to register node_page_size to mempool");
+        return -1;
+    }
+    int vnode_page_size;
+    if (!config.get("vnode_page_size", vnode_page_size) || vnode_page_size <= 0)
+    {
+        WARNING("failed to get vnode_page_size");
+        return -1;
+    }
+    if (m_pool.register_item(sizeof(VNodePool::ObjectType), vnode_page_size) < 0)
+    {
+        WARNING("failed to register vnode_page_size to mempool");
+        return -1;
+    }
+    int list_page_size;
+    if (!config.get("list_page_size", list_page_size) || list_page_size <= 0)
+    {
+        WARNING("failed to get list_page_size");
+        return -1;
+    }
+    if (m_pool.register_item(sizeof(ListPool::ObjectType), list_page_size) < 0)
+    {
+        WARNING("failed to register list_page_size to mempool");
+        return -1;
+    }
+    int max_items_num;
+    if (!config.get("max_items_num", max_items_num) || max_items_num <= 0)
+    {
+        WARNING("failed to get max_items_num");
+        return -1;
+    }
+    if (m_pool.init(max_items_num) < 0)
+    {
+        WARNING("failed to init mempool");
+        return -1;
+    }
+    m_node_pool.init(&m_pool);
+    m_vnode_pool.init(&m_pool);
+    m_list_pool.init(&m_pool);
     int dict_hash_size;
     if (!config.get("dict_hash_size", dict_hash_size) || dict_hash_size <= 0)
     {
@@ -429,6 +496,7 @@ int InvertIndex::init(const char *path, const char *file)
         return -1;
     }
     m_dict->set_pool(&m_node_pool);
+    m_dict->set_cleanup(cleanup_node, (intptr_t)this);
     int add_dict_hash_size;
     if (!config.get("add_dict_hash_size", add_dict_hash_size) || add_dict_hash_size <= 0)
     {
@@ -442,6 +510,7 @@ int InvertIndex::init(const char *path, const char *file)
         return -1;
     }
     m_add_dict->set_pool(&m_vnode_pool);
+    m_add_dict->set_cleanup(cleanup_diff_node, (intptr_t)this);
     int del_dict_hash_size;
     if (!config.get("del_dict_hash_size", del_dict_hash_size) || del_dict_hash_size <= 0)
     {
@@ -455,6 +524,8 @@ int InvertIndex::init(const char *path, const char *file)
         return -1;
     }
     m_del_dict->set_pool(&m_vnode_pool);
+    m_del_dict->set_cleanup(cleanup_diff_node, (intptr_t)this);
+    WARNING("init ok");
     return 0;
 }
 
