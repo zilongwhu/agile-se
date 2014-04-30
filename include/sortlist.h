@@ -106,7 +106,7 @@ class SortList
             m_size = 0;
         }
 
-        size_t size() const { return m_size; }
+        uint32_t size() const { return m_size; }
 
         iterator begin() const
         {
@@ -216,7 +216,7 @@ class SortList
         }
     private:
         vaddr_t m_head;
-        size_t m_size;
+        uint32_t m_size;
 
         ObjectPool *m_pool;
 };
