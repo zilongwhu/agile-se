@@ -18,7 +18,6 @@
 #define __AGILE_SE_INVERT_INDEX_H__
 
 #include <stdint.h>
-#include <ext/hash_map>
 #include <string>
 #include <vector>
 #include "mempool2.h"

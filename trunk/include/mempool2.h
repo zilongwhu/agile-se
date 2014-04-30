@@ -17,9 +17,8 @@
 #ifndef __AGILE_SE_MEMORY_POOL2_H__
 #define __AGILE_SE_MEMORY_POOL2_H__
 
-#include <map>
 #include <vector>
-#include <utility>
+#include <ext/hash_map>
 #include "log.h"
 
 class BitsSpliter
@@ -55,6 +54,7 @@ class VMemoryPool
     public:
         typedef uint32_t vaddr_t;
     private:
+        typedef __gnu_cxx::hash_map<uint32_t, uint32_t> Map;
         const static uint32_t uint32_max = (4294967295U);
     private:
         VMemoryPool(const VMemoryPool &);
@@ -137,7 +137,7 @@ class VMemoryPool
                 m_slabs[i].cur_block_no = uint32_max;
                 m_slabs[i].block_num = 0;
 
-                m_size2off.insert(std::make_pair(elem_size, i));
+                m_size2off[elem_size] = i;
 
                 WARNING("m_slabs[%d]:", int(i));
                 WARNING("    elem_size: %u", elem_size);
@@ -148,6 +148,7 @@ class VMemoryPool
                         m_slabs[i].meta.bits.index_mask(),
                         m_slabs[i].meta.bits.offset_mask());
             }
+            m_size2off_end = m_size2off.end();
             WARNING("init ok");
             return 0;
         }
@@ -156,8 +157,8 @@ class VMemoryPool
         {
             Slab *p_slab = NULL;
             {
-                std::map<uint32_t, uint32_t>::const_iterator it = m_size2off.find(elem_size);
-                if (it == m_size2off.end())
+                Map::iterator it = m_size2off.find(elem_size);
+                if (it == m_size2off_end)
                 {
                     WARNING("unregistered elem size: %u", elem_size);
                     return 0;
@@ -386,7 +387,8 @@ class VMemoryPool
         }
     private:
         std::vector<std::pair<uint32_t, uint32_t> > m_registered_items;
-        std::map<uint32_t, uint32_t> m_size2off;
+        Map m_size2off;
+        Map::iterator m_size2off_end;
 
         std::vector<Slab> m_slabs;
         std::vector<Block> m_blocks;
