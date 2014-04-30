@@ -20,32 +20,29 @@
 #include "mempool.h"
 #include "multi_mempool.h"
 
-const MemoryPool::vaddr_t MemoryPool::null = NULL;
-const MultiMemoryPool::vaddr_t MultiMemoryPool::null = NULL;
-
-volatile int DelayPool::s_now;
-
-static void *pool_timer_thread(void *ptr)
-{
-    volatile int &now = *(volatile int *)ptr;
-    pthread_detach(pthread_self());
-
-    while (1)
-    {
-        now = ::time(NULL);
-        ::usleep(500*1000);
-    }
-    return NULL;
-}
-
-void DelayPool::init_time_updater()
-{
-    s_now = ::time(NULL);
-
-    pthread_t pid;
-    int ret = ::pthread_create(&pid, NULL, pool_timer_thread, (void *)&s_now);
-    if (ret != 0)
-    {
-        ::exit(-1);
-    }
-}
+//volatile int DelayPool::s_now;
+//
+//static void *pool_timer_thread(void *ptr)
+//{
+//    volatile int &now = *(volatile int *)ptr;
+//    pthread_detach(pthread_self());
+//
+//    while (1)
+//    {
+//        now = ::time(NULL);
+//        ::usleep(500*1000);
+//    }
+//    return NULL;
+//}
+//
+//void DelayPool::init_time_updater()
+//{
+//    s_now = ::time(NULL);
+//
+//    pthread_t pid;
+//    int ret = ::pthread_create(&pid, NULL, pool_timer_thread, (void *)&s_now);
+//    if (ret != 0)
+//    {
+//        ::exit(-1);
+//    }
+//}

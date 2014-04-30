@@ -29,7 +29,7 @@ struct FieldConfig
     int size;
 };
 
-void ForwardIndex::cleanup(HashTable<long, void *>::node_t *node, void *arg)
+void ForwardIndex::cleanup(Hash::node_t *node, intptr_t arg)
 {
     ForwardIndex *ptr = (ForwardIndex *)arg;
     if (NULL == ptr || ptr->m_delayed_list.size() == 0)
@@ -38,13 +38,13 @@ void ForwardIndex::cleanup(HashTable<long, void *>::node_t *node, void *arg)
         ::abort();
     }
     cleanup_data_t &cd = ptr->m_delayed_list.front();
-    if (node->value != cd.mem)
+    if (node->value != cd.addr)
     {
         FATAL("should not run to here");
         ::abort();
     }
     cd.clean();
-    ptr->m_pool.free(cd.mem);
+    ptr->m_pool.free(cd.addr, ptr->m_info_size);
     ptr->m_delayed_list.pop_front();
 }
 
@@ -217,9 +217,9 @@ int ForwardIndex::init(const char *path, const char *file)
         WARNING("failed to get mem_page_size");
         goto FAIL;
     }
-    if (m_pool.init(m_info_size, mem_page_size*1024L*1024L) < 0)
+    if (m_pool.register_item(m_info_size, mem_page_size) < 0)
     {
-        WARNING("failed to init mempool");
+        WARNING("failed to register info_size to mempool");
         goto FAIL;
     }
     int node_page_size;
@@ -228,9 +228,20 @@ int ForwardIndex::init(const char *path, const char *file)
         WARNING("failed to get node_page_size");
         goto FAIL;
     }
-    if (m_node_pool.init(node_page_size*1024L*1024L) < 0)
+    if (m_pool.register_item(sizeof(Hash::node_t), node_page_size) < 0)
     {
-        WARNING("failed to init nodepool");
+        WARNING("failed to register node_size to mempool");
+        goto FAIL;
+    }
+    int max_items_num;
+    if (!config.get("max_items_num", max_items_num) || max_items_num <= 0)
+    {
+        WARNING("failed to get max_items_num");
+        goto FAIL;
+    }
+    if (m_pool.init(max_items_num) < 0)
+    {
+        WARNING("failed to init mempool");
         goto FAIL;
     }
     int bucket_size;
@@ -239,12 +250,14 @@ int ForwardIndex::init(const char *path, const char *file)
         WARNING("failed to get bucket_size");
         goto FAIL;
     }
-    m_dict = new HashTable<long, void *>(&m_node_pool, bucket_size);
+    m_dict = new Hash(bucket_size);
     if (NULL == m_dict)
     {
         WARNING("failed to init hash dict");
         goto FAIL;
     }
+    m_dict->set_pool(&m_node_pool);
+    m_dict->set_cleanup(cleanup, (intptr_t)this);
     {
         __gnu_cxx::hash_map<std::string, FieldDes>::iterator it = m_fields.begin();
         while (it != m_fields.end())
@@ -257,7 +270,8 @@ int ForwardIndex::init(const char *path, const char *file)
             ++it;
         }
     }
-    WARNING("mempool[%d M], nodepool[%d M], bucket size[%d]", mem_page_size, node_page_size, bucket_size);
+    WARNING("mem_page_size[%d], node_page_size[%d], max_items_num[%d], bucket_size[%d]",
+            mem_page_size, node_page_size, max_items_num, bucket_size);
     return 0;
 FAIL:
     __gnu_cxx::hash_map<std::string, FieldDes>::iterator it = m_fields.begin();
@@ -285,10 +299,10 @@ int ForwardIndex::get_offset_by_name(const char *name) const
 
 void *ForwardIndex::get_info_by_id(long id) const
 {
-    void **value = m_dict->find(id);
+    vaddr_t *value = m_dict->find(id);
     if (value)
     {
-        return *value;
+        return m_pool.addr(*value);
     }
     return NULL;
 }
@@ -322,18 +336,21 @@ CLEAN:
 
 bool ForwardIndex::update(long id, const std::vector<std::pair<std::string, cJSON *> > &kvs)
 {
-    void *old = NULL;
-    {
-        void **pv = m_dict->find(id);
-        if (pv)
-        {
-            old = *pv;
-        }
-    }
-    void *mem = m_pool.alloc();
+    vaddr_t vnew = m_pool.alloc(m_info_size);
+    void *mem = m_pool.addr(vnew);
     if (NULL == mem)
     {
         return false;
+    }
+    vaddr_t vold = 0;
+    void *old = NULL;
+    {
+        vaddr_t *pv = m_dict->find(id);
+        if (pv)
+        {
+            vold = *pv;
+            old = m_pool.addr(vold);
+        }
     }
     if (old)
     {
@@ -345,6 +362,7 @@ bool ForwardIndex::update(long id, const std::vector<std::pair<std::string, cJSO
     }
     cleanup_data_t cd;
     cd.mem = NULL;
+    cd.addr = 0;
     for (size_t i = 0; i < kvs.size(); ++i)
     {
         const std::pair<std::string, cJSON *> &kv = kvs[i];
@@ -380,16 +398,18 @@ bool ForwardIndex::update(long id, const std::vector<std::pair<std::string, cJSO
             }
         }
     }
-    if (!m_dict->insert(id, mem))
+    if (!m_dict->insert(id, vnew))
     {
         cd.mem = mem;
+        cd.addr = vnew;
         cd.clean();
-        m_pool.free(mem);
+        m_pool.free(vnew, m_info_size);
         return false;
     }
     if (old)
     {
         cd.mem = old;
+        cd.addr = vold;
         m_delayed_list.push_back(cd);
     }
     return true;
@@ -397,10 +417,11 @@ bool ForwardIndex::update(long id, const std::vector<std::pair<std::string, cJSO
 
 void ForwardIndex::remove(long id)
 {
-    void **ptr;
+    vaddr_t *ptr;
     if (m_dict->remove(id, ptr))
     {
-        m_cleanup_data.mem = ptr;
+        m_cleanup_data.mem = m_pool.addr(*ptr);
+        m_cleanup_data.addr = *ptr;
         m_delayed_list.push_back(m_cleanup_data);
     }
 }

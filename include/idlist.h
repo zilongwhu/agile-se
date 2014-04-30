@@ -19,30 +19,38 @@
 
 #include <stdint.h>
 #include <string.h>
-#include "mempool.h"
+#include "mempool2.h"
+#include "delaypool.h"
 
-class IDList
+template<typename TMemoryPool = VMemoryPool>
+class TIDList
 {
     private:
+        typedef typename TMemoryPool::vaddr_t vaddr_t;
+
         struct node_t
         {
-            node_t *next;
+            vaddr_t next;
             int id;
             uint8_t value[];
         };
+
+        typedef TDelayPool<TMemoryPool> DelayPool;
     public:
         class iterator
         {
             public:
-                iterator(node_t *node)
+                iterator(vaddr_t cur, DelayPool *pool)
                 {
-                    m_cur = node;
+                    m_cur = cur;
+                    m_pool = pool;
                 }
                 iterator & operator ++()
                 {
-                    if (m_cur)
+                    if (0 != m_cur)
                     {
-                        m_cur = m_cur->next;
+                        node_t *node = (node_t *)m_pool->addr(m_cur);
+                        m_cur = node->next;
                     }
                     return *this;
                 }
@@ -54,11 +62,11 @@ class IDList
                 }
                 int operator *() const
                 {
-                    return m_cur->id;
+                    return ((node_t *)m_pool->addr(m_cur))->id;
                 }
                 void *payload()
                 {
-                    return m_cur->value;
+                    return ((node_t *)m_pool->addr(m_cur))->value;
                 }
                 bool operator ==(const iterator &o) const
                 {
@@ -69,29 +77,35 @@ class IDList
                     return m_cur != o.m_cur;
                 }
             private:
-                node_t *m_cur;
+                vaddr_t m_cur;
+                DelayPool *m_pool;
         };
     private:
-        IDList(const IDList &);
-        IDList &operator =(const IDList &);
+        TIDList(const TIDList &);
+        TIDList &operator =(const TIDList &);
     public:
-        IDList(DelayPool *pool, size_t payload_len)
+        TIDList(DelayPool *pool, size_t payload_len)
         {
             m_pool = pool;
             m_payload_len = payload_len;
-            m_head = NULL;
+            m_element_size = element_size(payload_len);
+            m_head = 0;
             m_size = 0;
         }
-        ~IDList()
+        ~TIDList()
         {
-            while (m_head)
+            node_t *node;
+            vaddr_t cur;
+            while (0 != m_head)
             {
-                node_t *cur = m_head;
-                m_head = m_head->next;
-                m_pool->delay_free(cur);
+                cur = m_head;
+                node = (node_t *)m_pool->addr(cur);
+                m_head = node->next;
+                m_pool->delay_free(cur, m_element_size);
             }
             m_pool = NULL;
             m_payload_len = 0;
+            m_element_size = 0;
             m_size = 0;
         }
 
@@ -100,112 +114,139 @@ class IDList
 
         iterator begin() const
         {
-            return iterator(m_head);
+            return iterator(m_head, m_pool);
         }
         iterator end() const
         {
-            return iterator(NULL);
+            return iterator(0, m_pool);
         }
 
         bool find(int id, void **payload = NULL) const
         {
-            node_t *cur = m_head;
-            while (cur && cur->id < id)
+            node_t *node;
+            vaddr_t cur = m_head;
+            while (0 != cur)
             {
-                cur = cur->next;
-            }
-            if (cur && cur->id == id)
-            {
-                if (payload)
+                node = (node_t *)m_pool->addr(cur);
+                if (node->id < id)
                 {
-                    *payload = &cur->value;
+                    cur = node->next;
                 }
-                return true;
+                else if (node->id == id)
+                {
+                    if (payload)
+                    {
+                        *payload = &node->value;
+                    }
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
             }
             return false;
         }
         bool insert(int id, void *payload)
         {
-            node_t *pre = NULL;
-            node_t *cur = m_head;
-            while (cur && cur->id < id)
-            {
-                pre = cur;
-                cur = cur->next;
-            }
-            if (cur && cur->id == id)
-            {
-                if (pre)
-                {
-                    pre->next = cur->next;
-                }
-                else
-                {
-                    m_head = cur->next;
-                }
-                m_pool->delay_free(cur);
-                --m_size;
-            }
-            node_t *tmp = (node_t *)m_pool->alloc();
-            if (NULL == tmp)
+            vaddr_t vnew = m_pool->alloc(m_element_size);
+            if (0 == vnew)
             {
                 return false;
             }
-            tmp->id = id;
+            node_t *node;
+            node_t *pre = NULL;
+            vaddr_t cur = m_head;
+            while (0 != cur)
+            {
+                node = (node_t *)m_pool->addr(cur);
+                if (node->id < id)
+                {
+                    pre = node;
+                    cur = node->next;
+                }
+                else if (node->id == id)
+                {
+                    if (pre)
+                    {
+                        pre->next = node->next;
+                    }
+                    else
+                    {
+                        m_head = node->next;
+                    }
+                    m_pool->delay_free(cur, m_element_size);
+                    --m_size;
+                    break;
+                }
+                else
+                {
+                    break;
+                }
+            }
+            node = (node_t *)m_pool->addr(vnew);
+            node->id = id;
             if (m_payload_len > 0)
             {
-                ::memcpy(tmp->value, payload, m_payload_len);
+                ::memcpy(node->value, payload, m_payload_len);
             }
             if (pre)
             {
-                tmp->next = pre->next;
-                pre->next = tmp;
+                node->next = pre->next;
+                pre->next = vnew;
             }
             else
             {
-                tmp->next = m_head;
-                m_head = tmp;
+                node->next = m_head;
+                m_head = vnew;
             }
             ++m_size;
             return true;
         }
         void remove(int id)
         {
+            node_t *node;
             node_t *pre = NULL;
-            node_t *cur = m_head;
-            while (cur && cur->id < id)
+            vaddr_t cur = m_head;
+            while (0 != cur)
             {
-                pre = cur;
-                cur = cur->next;
-            }
-            if (cur && cur->id == id)
-            {
-                if (pre)
+                node = (node_t *)m_pool->addr(cur);
+                if (node->id < id)
                 {
-                    pre->next = cur->next;
+                    pre = node;
+                    cur = node->next;
+                }
+                else if (node->id == id)
+                {
+                    if (pre)
+                    {
+                        pre->next = node->next;
+                    }
+                    else
+                    {
+                        m_head = node->next;
+                    }
+                    m_pool->delay_free(cur, m_element_size);
+                    --m_size;
+                    return ;
                 }
                 else
                 {
-                    m_head = cur->next;
+                    return ;
                 }
-                m_pool->delay_free(cur);
-                --m_size;
             }
-        }
-        void recycle()
-        {
-            m_pool->recycle();
         }
     public:
         static size_t element_size(size_t payload_len)
         {
-            return payload_len + sizeof(int) + sizeof(void *);
+            return payload_len + sizeof(int) + sizeof(vaddr_t);
         }
     private:
         DelayPool *m_pool;
         size_t m_payload_len;
+        size_t m_element_size;
 
-        node_t *m_head;
+        vaddr_t m_head;
         size_t m_size;
 };
 

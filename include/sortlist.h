@@ -18,33 +18,40 @@
 #define __AGILE_SE_SORTLIST_H__
 
 #include <utility>
-#include "mempool.h"
+#include "mempool2.h"
+#include "objectpool.h"
 
-template<typename T>
+template<typename T, typename TMemoryPool = VMemoryPool>
 class SortList
 {
     public:
+        typedef typename TMemoryPool::vaddr_t vaddr_t;
+
         struct node_t
         {
-            node_t *next;
+            vaddr_t next;
             T value;
 
-            node_t(): next(NULL) { }
-            node_t(const T &v): next(NULL), value(v) { }
+            node_t(): next(0) { }
+            node_t(const T &v): next(0), value(v) { }
         };
+
+        typedef TObjectPool<node_t, TMemoryPool> ObjectPool;
 
         class iterator
         {
             public:
-                iterator(node_t *node)
+                iterator(vaddr_t cur, ObjectPool *pool)
                 {
-                    m_cur = node;
+                    m_cur = cur;
+                    m_pool = pool;
                 }
                 iterator & operator ++()
                 {
-                    if (m_cur)
+                    if (0 != m_cur)
                     {
-                        m_cur = m_cur->next;
+                        node_t *node = m_pool->addr(m_cur);
+                        m_cur = node->next;
                     }
                     return *this;
                 }
@@ -56,11 +63,11 @@ class SortList
                 }
                 T &operator *() const
                 {
-                    return m_cur->value;
+                    return m_pool->addr(m_cur)->value;
                 }
                 T *operator ->() const
                 {
-                    return &m_cur->value;
+                    return &m_pool->addr(m_cur)->value;
                 }
                 bool operator ==(const iterator &o) const
                 {
@@ -71,24 +78,28 @@ class SortList
                     return m_cur != o.m_cur;
                 }
             private:
-                node_t *m_cur;
+                vaddr_t m_cur;
+                ObjectPool *m_pool;
         };
     private:
         SortList(const SortList &);
         SortList &operator =(const SortList &);
     public:
-        SortList(ObjectPool<node_t> *pool)
+        SortList(ObjectPool *pool)
         {
             m_pool = pool;
-            m_head = NULL;
+            m_head = 0;
             m_size = 0;
         }
         ~SortList()
         {
-            while (m_head)
+            vaddr_t cur;
+            node_t *node;
+            while (0 != m_head)
             {
-                node_t *cur = m_head;
-                m_head = m_head->next;
+                cur = m_head;
+                node = m_pool->addr(cur);
+                m_head = node->next;
                 m_pool->delay_free(cur);
             }
             m_pool = NULL;
@@ -99,63 +110,76 @@ class SortList
 
         iterator begin() const
         {
-            return iterator(m_head);
+            return iterator(m_head, m_pool);
         }
         iterator end() const
         {
-            return iterator(NULL);
+            return iterator(0, m_pool);
         }
 
         T *find(const T &v) const
         {
-            node_t *cur = m_head;
-            while (cur && cur->value < v)
+            node_t *node;
+            vaddr_t cur = m_head;
+            while (0 != cur)
             {
-                cur = cur->next;
+                node = m_pool->addr(cur);
+                if (!(node->value < v))
+                {
+                    break;
+                }
+                cur = node->next;
             }
-            if (cur && cur->value == v)
+            if (0 != cur && node->value == v)
             {
-                return &cur->value;
+                return &node->value;
             }
             return NULL;
         }
 
         bool insert(const T &v)
         {
-            node_t *pre = NULL;
-            node_t *cur = m_head;
-            while (cur && cur->value < v)
+            vaddr_t vnew = m_pool->template alloc<const T &>(v);
+            if (0 == vnew)
             {
-                pre = cur;
-                cur = cur->next;
+                return false;
             }
-            if (cur && cur->value == v)
+            node_t *node;
+            node_t *pre = NULL;
+            vaddr_t cur = m_head;
+            while (0 != cur)
+            {
+                node = m_pool->addr(cur);
+                if (!(node->value < v))
+                {
+                    break;
+                }
+                pre = node;
+                cur = node->next;
+            }
+            if (0 != cur && node->value == v)
             {
                 if (pre)
                 {
-                    pre->next = cur->next;
+                    pre->next = node->next;
                 }
                 else
                 {
-                    m_head = cur->next;
+                    m_head = node->next;
                 }
                 m_pool->delay_free(cur);
                 --m_size;
             }
-            node_t *tmp = m_pool->template alloc<const T &>(v);
-            if (NULL == tmp)
-            {
-                return false;
-            }
+            node = m_pool->addr(vnew);
             if (pre)
             {
-                tmp->next = pre->next;
-                pre->next = tmp;
+                node->next = pre->next;
+                pre->next = vnew;
             }
             else
             {
-                tmp->next = m_head;
-                m_head = tmp;
+                node->next = m_head;
+                m_head = vnew;
             }
             ++m_size;
             return true;
@@ -163,37 +187,38 @@ class SortList
 
         void remove(const T &v)
         {
+            node_t *node;
             node_t *pre = NULL;
-            node_t *cur = m_head;
-            while (cur && cur->value < v)
+            vaddr_t cur = m_head;
+            while (0 != cur)
             {
-                pre = cur;
-                cur = cur->next;
+                node = m_pool->addr(cur);
+                if (!(node->value < v))
+                {
+                    break;
+                }
+                pre = node;
+                cur = node->next;
             }
-            if (cur && cur->value == v)
+            if (0 != cur && node->value == v)
             {
                 if (pre)
                 {
-                    pre->next = cur->next;
+                    pre->next = node->next;
                 }
                 else
                 {
-                    m_head = cur->next;
+                    m_head = node->next;
                 }
                 m_pool->delay_free(cur);
                 --m_size;
             }
         }
-
-        void recycle()
-        {
-            m_pool->recycle();
-        }
     private:
-        node_t *m_head;
+        vaddr_t m_head;
         size_t m_size;
 
-        ObjectPool<node_t> *m_pool;
+        ObjectPool *m_pool;
 };
 
 #endif

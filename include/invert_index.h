@@ -21,9 +21,11 @@
 #include <ext/hash_map>
 #include <string>
 #include <vector>
-#include "mempool.h"
-#include "idlist.h"
+#include "mempool2.h"
+#include "delaypool.h"
+#include "objectpool.h"
 #include "hashtable.h"
+#include "idlist.h"
 #include "invert_type.h"
 #include "doclist.h"
 
@@ -35,6 +37,18 @@ class InvertIndex
             uint8_t type;
             std::string word;
         };
+    private:
+        typedef TDelayPool<VMemoryPool> Pool;
+        typedef Pool::vaddr_t vaddr_t;
+
+        typedef HashTable<uint64_t, void *> Hash;
+        typedef Hash::ObjectPool NodePool;
+
+        typedef HashTable<uint64_t, vaddr_t> VHash;
+        typedef VHash::ObjectPool VNodePool;
+
+        typedef TIDList<VMemoryPool> IDList;
+        typedef TObjectPool<IDList, VMemoryPool> ListPool;
     private:
         InvertIndex(const InvertIndex &);
         InvertIndex &operator =(const InvertIndex &);
@@ -58,35 +72,26 @@ class InvertIndex
 
         void recycle()
         {
-            m_node_pool.recycle(cleanup_node, this);
-            m_diff_node_pool.recycle(cleanup_diff_node, this);
-
-            __gnu_cxx::hash_map<size_t, DelayPool *>::iterator it = m_list_pools.begin();
-            while (it != m_list_pools.end())
-            {
-                it->second->recycle();
-                ++it;
-            }
+            m_pool.recycle();
         }
     private:
         DocList *trigger(uint64_t sign, uint8_t type) const;
         bool insert(const char *keystr, uint8_t type, int32_t docid, void *payload);
         void merge(uint64_t sign, uint8_t type);
     private:
-        static void cleanup_node(HashTable<uint64_t, void *>::node_t *node, void *arg);
-        static void cleanup_diff_node(HashTable<uint64_t, IDList *>::node_t *node, void *arg);
+        static void cleanup_node(Hash::node_t *node, intptr_t arg);
+        static void cleanup_diff_node(VHash::node_t *node, intptr_t arg);
     private:
         InvertTypes m_types;
 
-        ObjectPool<HashTable<uint64_t, void *>::node_t> m_node_pool;
-        ObjectPool<HashTable<uint64_t, IDList *>::node_t> m_diff_node_pool;
+        Pool m_pool;
+        NodePool m_node_pool;
+        VNodePool m_vnode_pool;
+        ListPool m_list_pool;
 
-        ObjectPool<IDList> m_list_pool;
-        __gnu_cxx::hash_map<size_t, DelayPool *> m_list_pools;
-
-        HashTable<uint64_t, void *> *m_dict;
-        HashTable<uint64_t, IDList *> *m_add_dict;
-        HashTable<uint64_t, IDList *> *m_del_dict;
+        Hash *m_dict;
+        VHash *m_add_dict;
+        VHash *m_del_dict;
 };
 
 #endif

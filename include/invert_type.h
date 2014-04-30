@@ -18,7 +18,6 @@
 #define __AGILE_SE_INVERT_TYPE_H__
 
 #include <openssl/md5.h>
-#include "mempool.h"
 #include "invert_parser.h"
 
 struct InvertType
@@ -27,7 +26,6 @@ struct InvertType
     uint16_t payload_len;
     char prefix[32];
     InvertParser *parser;
-    DelayPool *pool;
 };
 
 struct InvertTypes
