@@ -38,7 +38,7 @@ class MultiMemoryPool
         ~MultiMemoryPool()
         {
             Map::iterator it = m_pools.begin();
-            while (it != m_pools_end)
+            while (it != m_pools.end())
             {
                 if (it->second)
                 {
