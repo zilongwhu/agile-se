@@ -56,6 +56,13 @@ int InvertTypes::init(const char *path, const char *file)
             WARNING("failed to get %s", buffer);
             goto FAIL;
         }
+        int page_size;
+        ::snprintf(buffer, sizeof buffer, "invert_%d_page_size", i);
+        if (!config.get(buffer, page_size))
+        {
+            WARNING("failed to get %s", buffer);
+            goto FAIL;
+        }
         std::string prefix;
         ::snprintf(buffer, sizeof buffer, "invert_%d_prefix", i);
         if (!config.get(buffer, prefix))
@@ -70,10 +77,11 @@ int InvertTypes::init(const char *path, const char *file)
             WARNING("failed to get %s", buffer);
             goto FAIL;
         }
-        WARNING("invert[%d]: type=%d, payload_len=%d, prefix=%s, parser=%s",
-                i, type, length, prefix.c_str(), parser.c_str());
+        WARNING("invert[%d]: type=%d, payload_len=%d, page_size=%d, prefix=%s, parser=%s",
+                i, type, length, page_size, prefix.c_str(), parser.c_str());
         if (type < 0 || type >= 0xFF
                 || length < 0 || length > 0xFFFF
+                || page_size < 0
                 || prefix.length() == 0
                 || prefix.length() >= sizeof(types[i].prefix)
                 || parser.length() == 0)
@@ -89,6 +97,7 @@ int InvertTypes::init(const char *path, const char *file)
         }
         types[i].type = type;
         types[i].payload_len = length;
+        types[i].page_size = page_size;
         ::snprintf(types[i].prefix, sizeof(types[i].prefix), "%s", prefix.c_str());
         types[i].parser = (*it->second)();
     }

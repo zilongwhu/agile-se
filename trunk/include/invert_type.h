@@ -24,6 +24,7 @@ struct InvertType
 {
     uint8_t type;
     uint16_t payload_len;
+    uint32_t page_size;
     char prefix[32];
     InvertParser *parser;
 };
