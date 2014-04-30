@@ -25,6 +25,7 @@
 #include "objectpool.h"
 #include "hashtable.h"
 #include "idlist.h"
+#include "sortlist.h"
 #include "invert_type.h"
 #include "doclist.h"
 
@@ -48,6 +49,10 @@ class InvertIndex
 
         typedef TIDList<VMemoryPool> IDList;
         typedef TObjectPool<IDList, VMemoryPool> ListPool;
+
+        typedef SortList<uint64_t, VMemoryPool> SignList;
+        typedef TObjectPool<SignList, VMemoryPool> SignPool;
+        typedef SignList::ObjectPool SNodePool;
     private:
         InvertIndex(const InvertIndex &);
         InvertIndex &operator =(const InvertIndex &);
@@ -57,6 +62,7 @@ class InvertIndex
             m_dict = NULL;
             m_add_dict = NULL;
             m_del_dict = NULL;
+            m_docid2signs = NULL;
         }
         ~ InvertIndex();
 
@@ -80,17 +86,21 @@ class InvertIndex
     private:
         static void cleanup_node(Hash::node_t *node, intptr_t arg);
         static void cleanup_diff_node(VHash::node_t *node, intptr_t arg);
+        static void cleanup_sign_node(VHash::node_t *node, intptr_t arg);
     private:
         InvertTypes m_types;
 
         Pool m_pool;
         NodePool m_node_pool;
         VNodePool m_vnode_pool;
+        SNodePool m_snode_pool;
         ListPool m_list_pool;
+        SignPool m_sign_pool;
 
         Hash *m_dict;
         VHash *m_add_dict;
         VHash *m_del_dict;
+        VHash *m_docid2signs;
 };
 
 #endif

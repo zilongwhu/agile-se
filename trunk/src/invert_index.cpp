@@ -401,6 +401,11 @@ InvertIndex::~InvertIndex()
         delete m_del_dict;
         m_del_dict = NULL;
     }
+    if (m_docid2signs)
+    {
+        delete m_docid2signs;
+        m_docid2signs = NULL;
+    }
 }
 
 int InvertIndex::init(const char *path, const char *file)
@@ -418,7 +423,9 @@ int InvertIndex::init(const char *path, const char *file)
     }
     if (NodePool::init_pool(&m_pool) < 0
             || VNodePool::init_pool(&m_pool) < 0
-            || ListPool::init_pool(&m_pool) < 0)
+            || SNodePool::init_pool(&m_pool) < 0
+            || ListPool::init_pool(&m_pool) < 0
+            || SignPool::init_pool(&m_pool) < 0)
     {
         WARNING("failed to call init_pool");
         return -1;
@@ -458,6 +465,17 @@ int InvertIndex::init(const char *path, const char *file)
         WARNING("failed to register vnode_page_size to mempool");
         return -1;
     }
+    int snode_page_size;
+    if (!config.get("snode_page_size", snode_page_size) || snode_page_size <= 0)
+    {
+        WARNING("failed to get snode_page_size");
+        return -1;
+    }
+    if (m_pool.register_item(sizeof(SNodePool::ObjectType), snode_page_size) < 0)
+    {
+        WARNING("failed to register snode_page_size to mempool");
+        return -1;
+    }
     int list_page_size;
     if (!config.get("list_page_size", list_page_size) || list_page_size <= 0)
     {
@@ -467,6 +485,17 @@ int InvertIndex::init(const char *path, const char *file)
     if (m_pool.register_item(sizeof(ListPool::ObjectType), list_page_size) < 0)
     {
         WARNING("failed to register list_page_size to mempool");
+        return -1;
+    }
+    int sign_page_size;
+    if (!config.get("sign_page_size", sign_page_size) || sign_page_size <= 0)
+    {
+        WARNING("failed to get sign_page_size");
+        return -1;
+    }
+    if (m_pool.register_item(sizeof(SignPool::ObjectType), sign_page_size) < 0)
+    {
+        WARNING("failed to register sign_page_size to mempool");
         return -1;
     }
     int max_items_num;
@@ -482,7 +511,9 @@ int InvertIndex::init(const char *path, const char *file)
     }
     m_node_pool.init(&m_pool);
     m_vnode_pool.init(&m_pool);
+    m_snode_pool.init(&m_pool);
     m_list_pool.init(&m_pool);
+    m_sign_pool.init(&m_pool);
     int dict_hash_size;
     if (!config.get("dict_hash_size", dict_hash_size) || dict_hash_size <= 0)
     {
@@ -525,6 +556,20 @@ int InvertIndex::init(const char *path, const char *file)
     }
     m_del_dict->set_pool(&m_vnode_pool);
     m_del_dict->set_cleanup(cleanup_diff_node, (intptr_t)this);
+    int docid2signs_hash_size;
+    if (!config.get("docid2signs_hash_size", docid2signs_hash_size) || docid2signs_hash_size <= 0)
+    {
+        WARNING("failed to get docid2signs_hash_size");
+        return -1;
+    }
+    m_docid2signs = new VHash(docid2signs_hash_size);
+    if (NULL == m_docid2signs)
+    {
+        WARNING("failed to new m_docid2signs");
+        return -1;
+    }
+    m_docid2signs->set_pool(&m_vnode_pool);
+    m_docid2signs->set_cleanup(cleanup_sign_node, (intptr_t)this);
     WARNING("init ok");
     return 0;
 }
@@ -853,6 +898,20 @@ void InvertIndex::cleanup_diff_node(VHash::node_t *node, intptr_t arg)
     if (node->value)
     {
         ptr->m_list_pool.free(node->value);
+    }
+}
+
+void InvertIndex::cleanup_sign_node(VHash::node_t *node, intptr_t arg)
+{
+    InvertIndex *ptr = (InvertIndex *)arg;
+    if (NULL == ptr)
+    {
+        FATAL("should not run to here");
+        ::abort();
+    }
+    if (node->value)
+    {
+        ptr->m_sign_pool.free(node->value);
     }
 }
 
