@@ -66,6 +66,30 @@ struct A
     }
 };
 
+class TermParser: public InvertParser
+{
+    public:
+        TermParser() { memset(m_bytes, 0, sizeof m_bytes); }
+        void *parse(cJSON *json)
+        {
+            return m_bytes;
+        }
+    private:
+        char m_bytes[12];
+};
+
+class DummyParser: public InvertParser
+{
+    public:
+        void *parse(cJSON *json)
+        {
+            return NULL;
+        }
+};
+
+DEFINE_INVERT_PARSER(TermParser);
+DEFINE_INVERT_PARSER(DummyParser);
+
 int main(int argc, char *argv[])
 {
 //    DelayPool::init_time_updater();
@@ -163,11 +187,15 @@ int main(int argc, char *argv[])
 //        std::cout << np.delayed_num() << std::endl;
 //    }
 
+    REGISTER_INVERT_PARSER(TermParser);
+    REGISTER_INVERT_PARSER(DummyParser);
+
     ForwardIndex idx;
     idx.init("./conf", "fields.conf");
     idx.update(1, "abc", "1");
 
     InvertIndex invert;
+    invert.init("./conf", "invert.conf");
     InvertTypes types;
     types.get_sign("abc", 0);
 
