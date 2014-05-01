@@ -59,6 +59,7 @@ class InvertIndex
     public:
         InvertIndex()
         {
+            m_merge_threshold = 32;
             m_dict = NULL;
             m_add_dict = NULL;
             m_del_dict = NULL;
@@ -90,6 +91,7 @@ class InvertIndex
         static void cleanup_sign_node(VHash::node_t *node, intptr_t arg);
     private:
         InvertTypes m_types;
+        int32_t m_merge_threshold;
 
         Pool m_pool;
         NodePool m_node_pool;
