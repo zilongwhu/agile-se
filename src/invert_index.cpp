@@ -443,6 +443,11 @@ int InvertIndex::init(const char *path, const char *file)
             }
         }
     }
+    if (!config.get("merge_threshold", m_merge_threshold) || m_merge_threshold <= 0)
+    {
+        WARNING("failed to get merge_threshold");
+        return -1;
+    }
     int node_page_size;
     if (!config.get("node_page_size", node_page_size) || node_page_size <= 0)
     {
@@ -751,7 +756,7 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, void *
             WARNING("failed to insert docid[%d] for hash value[%s:%d]", docid, keystr, int(type));
             return false;
         }
-        if (add_list->size() > 32)
+        if (add_list->size() > (uint32_t)m_merge_threshold)
         {
             this->merge(sign, type);
         }
@@ -821,7 +826,7 @@ bool InvertIndex::remove(const char *keystr, uint8_t type, int32_t docid)
             WARNING("failed to remove docid[%d] for hash value[%s:%d]", docid, keystr, int(type));
             return false;
         }
-        if (del_list->size() > 32)
+        if (del_list->size() > (uint32_t)m_merge_threshold)
         {
             this->merge(sign, type);
         }
