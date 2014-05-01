@@ -74,7 +74,7 @@ class InvertIndex
 
         bool insert(const char *keystr, uint8_t type, int32_t docid, const std::string &json);
         bool insert(const char *keystr, uint8_t type, int32_t docid, cJSON *json);
-        bool reomve(const char *keystr, uint8_t type, int32_t docid);
+        bool remove(const char *keystr, uint8_t type, int32_t docid);
 
         void recycle()
         {

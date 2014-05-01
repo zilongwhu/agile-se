@@ -196,44 +196,86 @@ int main(int argc, char *argv[])
 
     InvertIndex invert;
     invert.init("./conf", "invert.conf");
-    InvertTypes types;
-    types.get_sign("abc", 0);
+    invert.insert("happy", 1, 0, "{}");
+    invert.insert("birthday", 1, 0, "{}");
+    invert.insert("happy", 1, 1, "{}");
+    invert.insert("new", 1, 1, "{}");
+    invert.insert("year", 1, 1, "{}");
+    invert.insert("nice", 1, 2, "{}");
+    invert.insert("to", 1, 2, "{}");
+    invert.insert("meet", 1, 2, "{}");
+    invert.insert("you", 1, 2, "{}");
 
-    VMemoryPool vp;
-    vp.register_item(8, 4096);
-    vp.register_item(4, 4096);
-    vp.init(1024);
+    DocList *list = invert.trigger("happy", 1);
+    if (list)
+    {
+        int docid = list->first();
+        while (docid != -1)
+        {
+            std::cout << docid << std::endl;
+            docid = list->next();
+        }
+        delete list;
+    }
+    std::cout << std::endl;
 
-    uint32_t pi = vp.alloc(4);
-    uint32_t pd = vp.alloc(8);
+    std::vector<uint64_t> signs;
 
-    *(int *)vp.addr(pi) = 1024;
-    *(double *)vp.addr(pd) = 4096;
+    if (invert.get_signs_by_docid(0, signs))
+    {
+        for (size_t i = 0; i < signs.size(); ++i)
+        {
+            std::cout << signs[i] << std::endl;
+        }
+    }
+    std::cout << std::endl;
+    if (invert.get_signs_by_docid(1, signs))
+    {
+        for (size_t i = 0; i < signs.size(); ++i)
+        {
+            std::cout << signs[i] << std::endl;
+        }
+    }
+    std::cout << std::endl;
+    if (invert.get_signs_by_docid(2, signs))
+    {
+        for (size_t i = 0; i < signs.size(); ++i)
+        {
+            std::cout << signs[i] << std::endl;
+        }
+    }
+    std::cout << std::endl;
+    if (invert.get_signs_by_docid(3, signs))
+    {
+        for (size_t i = 0; i < signs.size(); ++i)
+        {
+            std::cout << signs[i] << std::endl;
+        }
+    }
+    std::cout << std::endl;
 
-    std::cout << pi << ":" << *(int *)vp.addr(pi) << std::endl;
-    std::cout << pd << ":" << *(double *)vp.addr(pd) << std::endl;
+    invert.remove("happy", 1, 1);
+    list = invert.trigger("happy", 1);
+    if (list)
+    {
+        int docid = list->first();
+        while (docid != -1)
+        {
+            std::cout << docid << std::endl;
+            docid = list->next();
+        }
+        delete list;
+    }
+    std::cout << std::endl;
 
-    vp.free(pi);
-    vp.free(pd);
-
-    pi = vp.alloc(4);
-    pd = vp.alloc(8);
-
-    std::cout << pi << ":" << *(int *)vp.addr(pi) << std::endl;
-    std::cout << pd << ":" << *(double *)vp.addr(pd) << std::endl;
-
-    MultiMemoryPool mm;
-    TDelayPool<MultiMemoryPool> dp1;
-    TDelayPool<VMemoryPool> dp2;
-
-    dp2.register_item(sizeof(int), 0);
-    dp2.register_item(sizeof(double), 0);
-
-    TObjectPool<int, VMemoryPool> ip;
-    TObjectPool<double, VMemoryPool> dp;
-
-    ip.init(&dp2);
-    dp.init(&dp2);
+    if (invert.get_signs_by_docid(1, signs))
+    {
+        for (size_t i = 0; i < signs.size(); ++i)
+        {
+            std::cout << signs[i] << std::endl;
+        }
+    }
+    std::cout << std::endl;
 
     return 0;
 }

@@ -674,6 +674,7 @@ bool InvertIndex::get_signs_by_docid(int32_t docid, std::vector<uint64_t> &signs
         return false;
     }
     SignList *list = m_sign_pool.addr(*vlist);
+    signs.clear();
     signs.reserve(list->size());
     SignList::iterator it = list->begin();
     SignList::iterator end = list->end();
@@ -804,7 +805,7 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, void *
     return true;
 }
 
-bool InvertIndex::reomve(const char *keystr, uint8_t type, int32_t docid)
+bool InvertIndex::remove(const char *keystr, uint8_t type, int32_t docid)
 {
     uint64_t sign = m_types.get_sign(keystr, type);
     IDList *del_list = NULL;
