@@ -186,10 +186,67 @@ class TSkipList
         {
             vaddr_t path[M];
             void *old_payload;
-            vaddr_t vcur = this->find(id, &old_payload, path);
+            const vaddr_t vcur = this->find(id, &old_payload, path);
             if (vcur)
             {
-
+                if (m_payload_len > 0 && ::memcmp(payload, old_payload, m_payload_len))
+                {
+                    node_t *pold = (node_t *)m_pool->addr(vcur);
+                    const uint32_t level = pold->level;
+                    const uint32_t node_size = this->node_size(level);
+                    vaddr_t vnew = m_pool->alloc(node_size);
+                    if (0 == vnew)
+                    {
+                        WARNING("failed to alloc renew node, id=%d, level=%u, node_size=%u", id, level, node_size);
+                        return false;
+                    }
+                    node_t *pnew = (node_t *)m_pool->addr(vnew);
+                    pnew->id = id;
+                    pnew->level = level;
+                    for (int32_t i = level; i >=0; --i)
+                    {
+                        pnew->next[i] = pold->next[i];
+                    }
+                    ::memcpy(((char *)pnew) + this->payload_offset(level), payload, m_payload_len);
+                    if (0 == path[level])
+                    {
+                        for (int32_t i = level; i >= 0; --i)
+                        {
+                            if (m_head[i] == vcur)
+                            {
+                                m_head[i] = vnew;
+                            }
+                            else
+                            {
+                                node_t *pre = (node_t *)m_pool->addr(m_head[i]);
+                                while (i >= 0)
+                                {
+                                    while (pre->next[i] != vcur) /* go forward */
+                                    {
+                                        pre = (node_t *)m_pool->addr(pre->next[i]);
+                                    }
+                                    pre->next[i] = vnew;
+                                    --i; /* go down */
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        node_t *pre = (node_t *)m_pool->addr(path[level]);
+                        for (int32_t i = level; i >= 0; --i) /* go down */
+                        {
+                            while (pre->next[i] != vcur) /* go forward */
+                            {
+                                pre = (node_t *)m_pool->addr(pre->next[i]);
+                            }
+                            pre->next[i] = vnew;
+                        }
+                    }
+                    m_pool->delay_free(vcur, node_size);
+                    DEBUG("overwrite node ok, id=%d, level=%u, node_size=%u", id, level, node_size);
+                }
             }
             else
             {
@@ -231,6 +288,11 @@ class TSkipList
                         node_t *pre = (node_t *)m_pool->addr(path[i]);
                         pre->next[i] = vnew;
                     }
+                }
+                ++m_size;
+                if (level > m_cur_level)
+                {
+                    m_cur_level = level;
                 }
                 DEBUG("insert new node ok, id=%d, level=%u, node_size=%u", id, level, node_size);
             }

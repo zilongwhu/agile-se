@@ -190,95 +190,95 @@ int main(int argc, char *argv[])
 //        std::cout << np.delayed_num() << std::endl;
 //    }
 
-    REGISTER_INVERT_PARSER(TermParser);
-    REGISTER_INVERT_PARSER(DummyParser);
-
-    ForwardIndex idx;
-    idx.init("./conf", "fields.conf");
-    idx.update(1, "abc", "1");
-
-    InvertIndex invert;
-    invert.init("./conf", "invert.conf");
-    invert.insert("happy", 1, 0, "{}");
-    invert.insert("birthday", 1, 0, "{}");
-    invert.insert("happy", 1, 1, "{}");
-    invert.insert("new", 1, 1, "{}");
-    invert.insert("year", 1, 1, "{}");
-    invert.insert("nice", 1, 2, "{}");
-    invert.insert("to", 1, 2, "{}");
-    invert.insert("meet", 1, 2, "{}");
-    invert.insert("you", 1, 2, "{}");
-
-    DocList *list = invert.trigger("happy", 1);
-    if (list)
-    {
-        int docid = list->first();
-        while (docid != -1)
-        {
-            std::cout << docid << std::endl;
-            docid = list->next();
-        }
-        delete list;
-    }
-    std::cout << std::endl;
-
-    std::vector<uint64_t> signs;
-
-    if (invert.get_signs_by_docid(0, signs))
-    {
-        for (size_t i = 0; i < signs.size(); ++i)
-        {
-            std::cout << signs[i] << std::endl;
-        }
-    }
-    std::cout << std::endl;
-    if (invert.get_signs_by_docid(1, signs))
-    {
-        for (size_t i = 0; i < signs.size(); ++i)
-        {
-            std::cout << signs[i] << std::endl;
-        }
-    }
-    std::cout << std::endl;
-    if (invert.get_signs_by_docid(2, signs))
-    {
-        for (size_t i = 0; i < signs.size(); ++i)
-        {
-            std::cout << signs[i] << std::endl;
-        }
-    }
-    std::cout << std::endl;
-    if (invert.get_signs_by_docid(3, signs))
-    {
-        for (size_t i = 0; i < signs.size(); ++i)
-        {
-            std::cout << signs[i] << std::endl;
-        }
-    }
-    std::cout << std::endl;
-
-    invert.remove("happy", 1, 1);
-    list = invert.trigger("happy", 1);
-    if (list)
-    {
-        int docid = list->first();
-        while (docid != -1)
-        {
-            std::cout << docid << std::endl;
-            docid = list->next();
-        }
-        delete list;
-    }
-    std::cout << std::endl;
-
-    if (invert.get_signs_by_docid(1, signs))
-    {
-        for (size_t i = 0; i < signs.size(); ++i)
-        {
-            std::cout << signs[i] << std::endl;
-        }
-    }
-    std::cout << std::endl;
+//    REGISTER_INVERT_PARSER(TermParser);
+//    REGISTER_INVERT_PARSER(DummyParser);
+//
+//    ForwardIndex idx;
+//    idx.init("./conf", "fields.conf");
+//    idx.update(1, "abc", "1");
+//
+//    InvertIndex invert;
+//    invert.init("./conf", "invert.conf");
+//    invert.insert("happy", 1, 0, "{}");
+//    invert.insert("birthday", 1, 0, "{}");
+//    invert.insert("happy", 1, 1, "{}");
+//    invert.insert("new", 1, 1, "{}");
+//    invert.insert("year", 1, 1, "{}");
+//    invert.insert("nice", 1, 2, "{}");
+//    invert.insert("to", 1, 2, "{}");
+//    invert.insert("meet", 1, 2, "{}");
+//    invert.insert("you", 1, 2, "{}");
+//
+//    DocList *list = invert.trigger("happy", 1);
+//    if (list)
+//    {
+//        int docid = list->first();
+//        while (docid != -1)
+//        {
+//            std::cout << docid << std::endl;
+//            docid = list->next();
+//        }
+//        delete list;
+//    }
+//    std::cout << std::endl;
+//
+//    std::vector<uint64_t> signs;
+//
+//    if (invert.get_signs_by_docid(0, signs))
+//    {
+//        for (size_t i = 0; i < signs.size(); ++i)
+//        {
+//            std::cout << signs[i] << std::endl;
+//        }
+//    }
+//    std::cout << std::endl;
+//    if (invert.get_signs_by_docid(1, signs))
+//    {
+//        for (size_t i = 0; i < signs.size(); ++i)
+//        {
+//            std::cout << signs[i] << std::endl;
+//        }
+//    }
+//    std::cout << std::endl;
+//    if (invert.get_signs_by_docid(2, signs))
+//    {
+//        for (size_t i = 0; i < signs.size(); ++i)
+//        {
+//            std::cout << signs[i] << std::endl;
+//        }
+//    }
+//    std::cout << std::endl;
+//    if (invert.get_signs_by_docid(3, signs))
+//    {
+//        for (size_t i = 0; i < signs.size(); ++i)
+//        {
+//            std::cout << signs[i] << std::endl;
+//        }
+//    }
+//    std::cout << std::endl;
+//
+//    invert.remove("happy", 1, 1);
+//    list = invert.trigger("happy", 1);
+//    if (list)
+//    {
+//        int docid = list->first();
+//        while (docid != -1)
+//        {
+//            std::cout << docid << std::endl;
+//            docid = list->next();
+//        }
+//        delete list;
+//    }
+//    std::cout << std::endl;
+//
+//    if (invert.get_signs_by_docid(1, signs))
+//    {
+//        for (size_t i = 0; i < signs.size(); ++i)
+//        {
+//            std::cout << signs[i] << std::endl;
+//        }
+//    }
+//    std::cout << std::endl;
 
     TDelayPool<VMemoryPool> dp;
     TSkipList<>::init_pool(&dp, 8);
@@ -290,7 +290,8 @@ int main(int argc, char *argv[])
 
     for (int i = 0; i < 10000; ++i)
     {
-        nums[i] = rand();
+        nums[i] = rand() % 1000;
+        payload = rand();
         sl.insert(nums[i], &payload);
     }
 
