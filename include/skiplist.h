@@ -41,7 +41,7 @@ class TSkipList
         class iterator
         {
             public:
-                iterator(vaddr_t cur, TSkipList *list)
+                iterator(vaddr_t cur, const TSkipList *list)
                     : m_list(list), m_pool(list->m_pool)
                 {
                     m_cur = cur;
@@ -84,8 +84,8 @@ class TSkipList
                 }
             private:
                 vaddr_t m_cur;
-                TSkipList *const m_list;
-                DelayPool *const m_pool;
+                const TSkipList *m_list;
+                const DelayPool *m_pool;
         };
     public:
         static int init_pool(DelayPool *pool, uint32_t payload_len)

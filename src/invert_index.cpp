@@ -151,7 +151,7 @@ class BigList: public DocList
 class AddList: public DocList
 {
     public:
-        typedef InvertIndex::IDList::iterator Iterator;
+        typedef InvertIndex::SkipList::iterator Iterator;
 
         AddList(uint64_t sign, uint8_t type, uint16_t payload_len, Iterator it)
             : m_it(it), m_it_c(it), m_end(0, NULL)
@@ -223,7 +223,7 @@ class AddList: public DocList
 class DeleteList: public DocList
 {
     public:
-        typedef InvertIndex::IDList::iterator Iterator;
+        typedef InvertIndex::SkipList::iterator Iterator;
 
         DeleteList(Iterator it): m_it(it), m_it_c(it), m_end(0, NULL) { }
 
@@ -430,13 +430,16 @@ int InvertIndex::init(const char *path, const char *file)
         WARNING("failed to call init_pool");
         return -1;
     }
+    if (SkipList::init_pool(&m_pool, 0) < 0)
+    {
+        WARNING("failed to register item for deleted list");
+        return -1;
+    }
     for (int i = 0; i < 0xFF; ++i)
     {
         if (m_types.is_valid_type(i))
         {
-            if (m_pool.register_item(IDList::element_size(
-                            m_types.types[i].payload_len),
-                        m_types.types[i].page_size) < 0)
+            if (SkipList::init_pool(&m_pool, m_types.types[i].payload_len) < 0)
             {
                 WARNING("failed to register element size for invert type: %d", i);
                 return -1;
@@ -599,8 +602,8 @@ DocList *InvertIndex::trigger(uint64_t sign, uint8_t type) const
     {
         return NULL;
     }
-    IDList *add = m_list_pool.addr(*vadd);
-    IDList *del = NULL;
+    SkipList *add = m_list_pool.addr(*vadd);
+    SkipList *del = NULL;
 
     vaddr_t *vdel = m_del_dict->find(sign);
     if (NULL != vdel)
@@ -723,7 +726,7 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, cJSON 
 bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, void *payload)
 {
     uint64_t sign = m_types.get_sign(keystr, type);
-    IDList *del_list = NULL;
+    SkipList *del_list = NULL;
     vaddr_t *vdel_list = m_del_dict->find(sign);
     if (vdel_list)
     {
@@ -738,7 +741,7 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, void *
         }
     }
     size_t payload_len = m_types.types[type].payload_len;
-    IDList *add_list = NULL;
+    SkipList *add_list = NULL;
     vaddr_t *vadd_list = m_add_dict->find(sign);
     if (vadd_list)
     {
@@ -764,10 +767,10 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, void *
     else
     {
         vaddr_t vlist = m_list_pool.alloc(&m_pool, payload_len);
-        IDList *tmp = m_list_pool.addr(vlist);
+        SkipList *tmp = m_list_pool.addr(vlist);
         if (NULL == tmp)
         {
-            WARNING("failed to alloc IDList");
+            WARNING("failed to alloc SkipList");
             return false;
         }
         if (!tmp->insert(docid, payload) || !m_add_dict->insert(sign, vlist))
@@ -813,7 +816,7 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, void *
 bool InvertIndex::remove(const char *keystr, uint8_t type, int32_t docid)
 {
     uint64_t sign = m_types.get_sign(keystr, type);
-    IDList *del_list = NULL;
+    SkipList *del_list = NULL;
     vaddr_t *vdel_list = m_del_dict->find(sign);
     if (vdel_list)
     {
@@ -834,10 +837,10 @@ bool InvertIndex::remove(const char *keystr, uint8_t type, int32_t docid)
     else
     {
         vaddr_t vlist = m_list_pool.alloc(&m_pool, 0);
-        IDList *tmp = m_list_pool.addr(vlist);
+        SkipList *tmp = m_list_pool.addr(vlist);
         if (NULL == tmp)
         {
-            WARNING("failed to alloc IDList");
+            WARNING("failed to alloc SkipList");
             return false;
         }
         if (!tmp->insert(docid, NULL)
@@ -848,7 +851,7 @@ bool InvertIndex::remove(const char *keystr, uint8_t type, int32_t docid)
             return false;
         }
     }
-    IDList *add_list = NULL;
+    SkipList *add_list = NULL;
     vaddr_t *vadd_list = m_add_dict->find(sign);
     if (vadd_list)
     {
