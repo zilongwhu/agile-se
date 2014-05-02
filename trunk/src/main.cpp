@@ -294,8 +294,17 @@ int main(int argc, char *argv[])
         payload = rand();
         sl.insert(nums[i], &payload);
     }
-
+    
     WARNING("size=%u, cur_level=%u", sl.size(), sl.cur_level());
+
+    int n = 0;
+    TSkipList<>::iterator it = sl.begin();
+    while (it != sl.end())
+    {
+        WARNING("list[%03d] = %d", n, *it);
+        ++it;
+        ++n;
+    }
 
     for (int i = 0; i < 10000; ++i)
     {
