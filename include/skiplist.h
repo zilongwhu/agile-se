@@ -300,6 +300,72 @@ class TSkipList
         }
         void remove(int id)
         {
+            vaddr_t path[M];
+            const vaddr_t vcur = this->find(id, NULL, path);
+            if (vcur)
+            {
+                node_t *pold = (node_t *)m_pool->addr(vcur);
+                const uint32_t level = pold->level;
+                const uint32_t node_size = this->node_size(level);
+                if (0 == path[level])
+                {
+                    for (int32_t i = level; i >= 0; --i)
+                    {
+                        if (m_head[i] == vcur)
+                        {
+                            m_head[i] = pold->next[i];
+                        }
+                        else
+                        {
+                            node_t *pre = (node_t *)m_pool->addr(m_head[i]);
+                            while (i >= 0)
+                            {
+                                while (pre->next[i] != vcur) /* go forward */
+                                {
+                                    pre = (node_t *)m_pool->addr(pre->next[i]);
+                                }
+                                pre->next[i] = pold->next[i];
+                                --i; /* go down */
+                            }
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    node_t *pre = (node_t *)m_pool->addr(path[level]);
+                    for (int32_t i = level; i >= 0; --i) /* go down */
+                    {
+                        while (pre->next[i] != vcur) /* go forward */
+                        {
+                            pre = (node_t *)m_pool->addr(pre->next[i]);
+                        }
+                        pre->next[i] = pold->next[i];
+                    }
+                }
+                if (level == m_cur_level)
+                {
+                    int32_t i;
+                    for (i = m_cur_level; i >= 0; --i)
+                    {
+                        if (0 != m_head[i])
+                        {
+                            break;
+                        }
+                    }
+                    if (i < 0)
+                    {
+                        m_cur_level = 0;
+                    }
+                    else
+                    {
+                        m_cur_level = i;
+                    }
+                }
+                --m_size;
+                m_pool->delay_free(vcur, node_size);
+                DEBUG("delete node ok, id=%d, level=%u, node_size=%u", id, level, node_size);
+            }
         }
     public:
         uint32_t rand_level() const

@@ -295,6 +295,8 @@ int main(int argc, char *argv[])
         sl.insert(nums[i], &payload);
     }
 
+    WARNING("size=%u, cur_level=%u", sl.size(), sl.cur_level());
+
     for (int i = 0; i < 10000; ++i)
     {
         if (!sl.find(nums[i]))
@@ -302,6 +304,13 @@ int main(int argc, char *argv[])
             FATAL("failed to find %d", nums[i]);
         }
     }
+
+    for (int i = 0; i < 10000; ++i)
+    {
+        sl.remove(nums[i]);
+    }
+
+    WARNING("size=%u, cur_level=%u", sl.size(), sl.cur_level());
 
     return 0;
 }
