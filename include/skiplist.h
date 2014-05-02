@@ -38,6 +38,56 @@ class TSkipList
 
         typedef TDelayPool<TMemoryPool> DelayPool;
     public:
+        class iterator
+        {
+            public:
+                iterator(vaddr_t cur, TSkipList *list)
+                    : m_list(list), m_pool(list->m_pool)
+                {
+                    m_cur = cur;
+                }
+                iterator & operator ++()
+                {
+                    if (0 != m_cur)
+                    {
+                        node_t *node = (node_t *)m_pool->addr(m_cur);
+                        m_cur = node->next[0];
+                    }
+                    return *this;
+                }
+                iterator operator ++(int)
+                {
+                    iterator tmp(*this);
+                    this->operator ++();
+                    return tmp;
+                }
+                int operator *() const
+                {
+                    return ((node_t *)m_pool->addr(m_cur))->id;
+                }
+                void *payload()
+                {
+                    node_t *node = (node_t *)m_pool->addr(m_cur);
+                    return ((char *)node) + m_list->payload_offset(node->level);
+                }
+                void find(int id)
+                {
+                    m_cur = m_list->find(m_cur, id);
+                }
+                bool operator ==(const iterator &o) const
+                {
+                    return m_cur == o.m_cur && m_list == o.m_list;
+                }
+                bool operator !=(const iterator &o) const
+                {
+                    return m_cur != o.m_cur || m_list != o.m_list;
+                }
+            private:
+                vaddr_t m_cur;
+                TSkipList *const m_list;
+                DelayPool *const m_pool;
+        };
+    public:
         static int init_pool(DelayPool *pool, uint32_t payload_len)
         {
             for (uint32_t i = 0; i < M; ++i)
@@ -87,6 +137,65 @@ class TSkipList
         uint32_t cur_level() const { return m_cur_level; }
         uint32_t size() const { return m_size; }
 
+        iterator begin() const
+        {
+            return iterator(m_head[0], this);
+        }
+        iterator end() const
+        {
+            return iterator(0, this);
+        }
+
+        vaddr_t find(vaddr_t vcur, int id) const
+            /* find first node where node->id >= id */
+        {
+            if (0 == vcur)
+            {
+                return 0;
+            }
+            node_t *cur = (node_t *)m_pool->addr(vcur);
+            if (id <= cur->id)
+            {
+                return vcur;
+            }
+            node_t *next;
+            vaddr_t vnext;
+            int32_t cur_level;
+            while (1)
+            {
+                cur_level = cur->level;
+                while (cur_level >= 0)
+                {
+                    vnext = cur->next[cur_level];
+                    if (0 == vnext)
+                    {
+                        --cur_level;
+                    }
+                    else
+                    {
+                        next = (node_t *)m_pool->addr(vnext);
+                        if (id == next->id)
+                        {
+                            return vnext;
+                        }
+                        else if (id < next->id)
+                        {
+                            --cur_level;
+                        }
+                        else
+                        {
+                            cur = next;
+                            break;
+                        }
+                    }
+                }
+                if (cur_level < 0)
+                {
+                    return vnext;
+                }
+            }
+            return 0;
+        }
         vaddr_t find(int id, void **payload = NULL, vaddr_t *path = NULL) const
         {
             if (path)
