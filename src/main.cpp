@@ -26,6 +26,9 @@
 #include "mempool2.h"
 #include "delaypool.h"
 #include "objectpool.h"
+#include "skiplist.h"
+
+int nums[10000];
 
 struct A
 {
@@ -276,6 +279,28 @@ int main(int argc, char *argv[])
         }
     }
     std::cout << std::endl;
+
+    TDelayPool<VMemoryPool> dp;
+    TSkipList<>::init_pool(&dp, 8);
+    dp.init(1024*1024);
+
+    TSkipList<> sl(&dp, 8);
+
+    long payload = 0;
+
+    for (int i = 0; i < 10000; ++i)
+    {
+        nums[i] = rand();
+        sl.insert(nums[i], &payload);
+    }
+
+    for (int i = 0; i < 10000; ++i)
+    {
+        if (!sl.find(nums[i]))
+        {
+            FATAL("failed to find %d", nums[i]);
+        }
+    }
 
     return 0;
 }
