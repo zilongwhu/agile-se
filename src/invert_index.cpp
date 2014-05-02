@@ -154,7 +154,7 @@ class AddList: public DocList
         typedef InvertIndex::SkipList::iterator Iterator;
 
         AddList(uint64_t sign, uint8_t type, uint16_t payload_len, Iterator it)
-            : m_it(it), m_it_c(it), m_end(0, NULL)
+            : m_it(it), m_it_c(it), m_end(0, it.list())
         {
             m_sign = sign;
             m_type = type;
@@ -180,18 +180,8 @@ class AddList: public DocList
         }
         int32_t find(int32_t docid)
         {
-            int32_t c = curr();
-            if (c == -1)
-                return -1;
-            else if (c >= docid)
-                return c;
-            for (++m_it; m_it != m_end; ++m_it)
-            {
-                c = *m_it;
-                if (c >= docid)
-                    return c;
-            }
-            return -1;
+            m_it.find(docid);
+            return curr();
         }
 
         InvertStrategy::info_t *get_strategy_data(InvertStrategy &st)
@@ -225,7 +215,7 @@ class DeleteList: public DocList
     public:
         typedef InvertIndex::SkipList::iterator Iterator;
 
-        DeleteList(Iterator it): m_it(it), m_it_c(it), m_end(0, NULL) { }
+        DeleteList(Iterator it): m_it(it), m_it_c(it), m_end(0, it.list()) { }
 
         int32_t first()
         {
@@ -246,18 +236,8 @@ class DeleteList: public DocList
         }
         int32_t find(int32_t docid)
         {
-            int32_t c = curr();
-            if (c == -1)
-                return -1;
-            else if (c >= docid)
-                return c;
-            for (++m_it; m_it != m_end; ++m_it)
-            {
-                c = *m_it;
-                if (c >= docid)
-                    return c;
-            }
-            return -1;
+            m_it.find(docid);
+            return curr();
         }
 
         InvertStrategy::info_t *get_strategy_data(InvertStrategy &/* st */)

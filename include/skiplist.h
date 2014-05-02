@@ -82,6 +82,10 @@ class TSkipList
                 {
                     return m_cur != o.m_cur || m_list != o.m_list;
                 }
+                const TSkipList *list() const
+                {
+                    return m_list;
+                }
             private:
                 vaddr_t m_cur;
                 const TSkipList *m_list;
