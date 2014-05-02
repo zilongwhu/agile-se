@@ -24,7 +24,7 @@
 #include "delaypool.h"
 #include "objectpool.h"
 #include "hashtable.h"
-#include "idlist.h"
+#include "skiplist.h"
 #include "sortlist.h"
 #include "invert_type.h"
 #include "doclist.h"
@@ -47,8 +47,8 @@ class InvertIndex
         typedef HashTable<uint64_t, vaddr_t> VHash;
         typedef VHash::ObjectPool VNodePool;
 
-        typedef TIDList<VMemoryPool> IDList;
-        typedef TObjectPool<IDList, VMemoryPool> ListPool;
+        typedef TSkipList<VMemoryPool> SkipList;
+        typedef TObjectPool<SkipList, VMemoryPool> ListPool;
 
         typedef SortList<uint64_t, VMemoryPool> SignList;
         typedef TObjectPool<SignList, VMemoryPool> SignPool;
