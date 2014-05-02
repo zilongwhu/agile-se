@@ -17,9 +17,11 @@
 #ifndef __AGILE_SE_DELAY_MEMORY_POOL_H__
 #define __AGILE_SE_DELAY_MEMORY_POOL_H__
 
-#include <time.h>
 #include <stdint.h>
 #include "log.h"
+
+extern volatile uint32_t g_now_time;
+void init_time_updater();
 
 template<typename TMemoryPool>
 class TDelayPool
@@ -115,7 +117,7 @@ class TDelayPool
             }
             node->next = 0;
             node->ptr = ptr;
-            node->push_time = ::time(NULL);
+            node->push_time = g_now_time;
             node->elem_size = elem_size;
             node->fun = fun;
             node->arg = arg;
@@ -142,7 +144,7 @@ class TDelayPool
 
         void recycle()
         {
-            const time_t now = ::time(NULL);
+            const uint32_t now = g_now_time;
             vaddr_t cur;
             node_t *node;
             while (0 != m_delayed_list.head)
