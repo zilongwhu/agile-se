@@ -169,6 +169,12 @@ class TDelayPool
                 --m_delayed_num;
             }
         }
+
+        void print_meta() const
+        {
+            m_pool.print_meta();
+            WARNING("delayed elem num=%lu", (uint64_t)m_delayed_num);
+        }
     private:
         TMemoryPool m_pool;
 
