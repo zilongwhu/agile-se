@@ -306,12 +306,28 @@ class VMemoryPool
 
         void print_meta() const
         {
+            int block_num = 0;
+            size_t total_used = 0;
             for (size_t i = 0; i < m_slabs.size(); ++i)
             {
-                WARNING("slab[%d]: elem_size=%u, page_size=%u, free_num=%u, block_num=%u",
-                        int(i), m_slabs[i].meta.elem_size, m_slabs[i].meta.page_size,
-                        m_slabs[i].free_num, m_slabs[i].block_num);
+                uint32_t page_num = (1u << m_slabs[i].meta.bits.index_num());
+                size_t mem_used = 0;
+
+                if (m_slabs[i].block_num > 0)
+                {
+                    mem_used = (sizeof(Block) + (sizeof(void *) + m_slabs[i].meta.page_size) * page_num) * (m_slabs[i].block_num - 1);
+                    mem_used += sizeof(Block) + sizeof(void *) * page_num + m_slabs[i].meta.page_size * m_blocks[m_slabs[i].cur_block_no].cur_page_no;
+                }
+                block_num += m_slabs[i].block_num;
+                total_used += mem_used;
+
+                WARNING("slab[%d]:", int(i));
+                WARNING("    elem_size=%u, page_size=%u, page_num_per_block=%u",
+                        m_slabs[i].meta.elem_size, m_slabs[i].meta.page_size, page_num);
+                WARNING("    free_num=%u, block_num=%u", m_slabs[i].free_num, m_slabs[i].block_num);
             }
+            total_used += (m_blocks.capacity() - block_num) * sizeof(Block);
+            WARNING("block num used=%u, not used=%u, total mem used=%lu", block_num, (uint32_t)(m_blocks.capacity() - block_num), (uint64_t)total_used);
         }
     private:
         struct SlabMeta

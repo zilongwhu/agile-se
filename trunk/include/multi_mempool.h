@@ -143,6 +143,26 @@ class MultiMemoryPool
                 ++it;
             }
         }
+
+        void print_meta() const
+        {
+            int i = 0;
+            size_t mem_used;
+            size_t total_used = 0;
+            Map::const_iterator it = m_pools.begin();
+            while (it != m_pools.end())
+            {
+                if (it->second)
+                {
+                    mem_used = it->second->mem();
+                    total_used += mem_used;
+                    WARNING("pool[%d]: elem_size=%u, mem used=%lu", i, it->first, (uint64_t)mem_used);
+                    ++i;
+                }
+                ++it;
+            }
+            WARNING("total mem used=%lu", (uint64_t)total_used);
+        }
     private:
         Map m_pools;
         Map::iterator m_pools_end;
