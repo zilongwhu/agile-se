@@ -259,7 +259,6 @@ int build_index()
     uint32_t update_invert_count = 0;
     uint32_t update_forward_count = 0;
 
-    std::vector<uint64_t> signs;
     std::vector<invert_data_t> items;
     std::vector<std::pair<std::string, std::string> > kvs;
     while (1)
@@ -279,7 +278,6 @@ int build_index()
                 P_MYLOG("must has [eventid, optype, level, oid]");
                 continue;
             }
-            int64_t eventid = ::strtoul(fields[0].c_str(), NULL, 10);
             int32_t optype = ::strtol(fields[1].c_str(), NULL, 10);
             int32_t level = ::strtol(fields[2].c_str(), NULL, 10);
             int32_t oid = ::strtoul(fields[3].c_str(), NULL, 10);
@@ -287,7 +285,6 @@ int build_index()
             {
                 continue;
             }
-            TRACE("eventid=%ld, optype=%d, level=%d, oid=%d", eventid, optype, level, oid);
             switch (level)
             {
                 case FORWARD_LEVEL:
@@ -311,14 +308,8 @@ int build_index()
                 case INVERT_LEVEL:
                     if (OP_DELETE == optype)
                     {
-                        if (invert.get_signs_by_docid(oid, signs))
-                        {
-                            for (size_t i = 0; i < signs.size(); ++i)
-                            {
-                                invert.remove(signs[i], oid);
-                            }
-                        }
                         idx.remove(oid);
+                        invert.remove(oid);
                         TRACE("delete ok, oid=%d", oid);
                         ++delete_count;
                     }
@@ -334,19 +325,13 @@ int build_index()
                         }
                         else
                         {
-                            if (invert.get_signs_by_docid(oid, signs))
-                            {
-                                for (size_t i = 0; i < signs.size(); ++i)
-                                {
-                                    invert.remove(signs[i], oid);
-                                }
-                            }
                             if (!idx.update(oid, kvs))
                             {
                                 P_MYLOG("failed to update forward index");
                             }
                             else
                             {
+                                invert.remove(oid);
                                 for (size_t i = 0; i < items.size(); ++i)
                                 {
                                     invert.insert(items[i].key.c_str(), items[i].type, oid, items[i].value);
@@ -360,7 +345,7 @@ int build_index()
             };
             if (now != g_now_time)
             {
-                WARNING("processe stats: update[forward=%u, invert=%u], delete[%u], in[%u ~ %u]",
+                P_MYLOG("processe stats: update[forward=%u, invert=%u], delete[%u], in[%u ~ %u]",
                         update_forward_count, update_invert_count, delete_count, now, g_now_time);
 
                 idx.recycle();

@@ -665,7 +665,6 @@ bool InvertIndex::get_signs_by_docid(int32_t docid, std::vector<uint64_t> &signs
         return false;
     }
     SignList *list = m_sign_pool.addr(*vlist);
-    signs.clear();
     signs.reserve(list->size());
     SignList::iterator it = list->begin();
     SignList::iterator end = list->end();
@@ -725,20 +724,6 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, cJSON 
 bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, void *payload)
 {
     uint64_t sign = m_types.get_sign(keystr, type);
-    SkipList *del_list = NULL;
-    vaddr_t *vdel_list = m_del_dict->find(sign);
-    if (vdel_list)
-    {
-        del_list = m_list_pool.addr(*vdel_list);
-    }
-    if (del_list)
-    {
-        del_list->remove(docid);
-        if (del_list->size() == 0)
-        {
-            m_del_dict->remove(sign);
-        }
-    }
     const uint32_t payload_len = m_types.types[type].payload_len;
     SkipList *add_list = NULL;
     vaddr_t *vadd_list = m_add_dict->find(sign);
@@ -779,6 +764,16 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, void *
             return false;
         }
     }
+    vaddr_t *vdel_list = m_del_dict->find(sign);
+    if (vdel_list)
+    {
+        SkipList *del_list = m_list_pool.addr(*vdel_list);
+        del_list->remove(docid);
+        if (del_list->size() == 0)
+        {
+            m_del_dict->remove(sign);
+        }
+    }
     SignList *sign_list = NULL;
     vaddr_t *vsign_list = m_docid2signs->find(docid);
     if (vsign_list)
@@ -807,70 +802,6 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, void *
             m_sign_pool.free(vlist);
             WARNING("failed to insert sign[%u] of hash value[%s:%d] for docid[%d]", sign, keystr, int(type), docid);
             return false;
-        }
-    }
-    return true;
-}
-
-bool InvertIndex::remove(uint64_t sign, int32_t docid)
-{
-    SkipList *del_list = NULL;
-    vaddr_t *vdel_list = m_del_dict->find(sign);
-    if (vdel_list)
-    {
-        del_list = m_list_pool.addr(*vdel_list);
-    }
-    if (del_list)
-    {
-        if (!del_list->insert(docid, NULL))
-        {
-            WARNING("failed to remove docid[%d] for hash value[%lu]", docid, sign);
-            return false;
-        }
-    }
-    else
-    {
-        vaddr_t vlist = m_list_pool.alloc(&m_pool, 0);
-        SkipList *tmp = m_list_pool.addr(vlist);
-        if (NULL == tmp)
-        {
-            WARNING("failed to alloc SkipList");
-            return false;
-        }
-        if (!tmp->insert(docid, NULL)
-                || !m_del_dict->insert(sign, vlist))
-        {
-            m_list_pool.free(vlist);
-            WARNING("failed to remove docid[%d] for hash value[%lu]", docid, sign);
-            return false;
-        }
-    }
-    SkipList *add_list = NULL;
-    vaddr_t *vadd_list = m_add_dict->find(sign);
-    if (vadd_list)
-    {
-        add_list = m_list_pool.addr(*vadd_list);
-    }
-    if (add_list)
-    {
-        add_list->remove(docid);
-        if (add_list->size() == 0)
-        {
-            m_add_dict->remove(sign);
-        }
-    }
-    SignList *sign_list = NULL;
-    vaddr_t *vsign_list = m_docid2signs->find(docid);
-    if (vsign_list)
-    {
-        sign_list = m_sign_pool.addr(*vsign_list);
-    }
-    if (sign_list)
-    {
-        sign_list->remove(sign);
-        if (sign_list->size() == 0)
-        {
-            m_docid2signs->remove(docid);
         }
     }
     return true;
@@ -906,42 +837,92 @@ bool InvertIndex::remove(const char *keystr, uint8_t type, int32_t docid)
             WARNING("failed to alloc SkipList");
             return false;
         }
-        if (!tmp->insert(docid, NULL)
-                || !m_del_dict->insert(sign, vlist))
+        if (!tmp->insert(docid, NULL) || !m_del_dict->insert(sign, vlist))
         {
             m_list_pool.free(vlist);
             WARNING("failed to remove docid[%d] for hash value[%s:%d]", docid, keystr, int(type));
             return false;
         }
     }
-    SkipList *add_list = NULL;
     vaddr_t *vadd_list = m_add_dict->find(sign);
     if (vadd_list)
     {
-        add_list = m_list_pool.addr(*vadd_list);
-    }
-    if (add_list)
-    {
+        SkipList *add_list = m_list_pool.addr(*vadd_list);
         add_list->remove(docid);
         if (add_list->size() == 0)
         {
             m_add_dict->remove(sign);
         }
     }
-    SignList *sign_list = NULL;
     vaddr_t *vsign_list = m_docid2signs->find(docid);
     if (vsign_list)
     {
-        sign_list = m_sign_pool.addr(*vsign_list);
-    }
-    if (sign_list)
-    {
+        SignList *sign_list = m_sign_pool.addr(*vsign_list);
         sign_list->remove(sign);
         if (sign_list->size() == 0)
         {
             m_docid2signs->remove(docid);
         }
     }
+    return true;
+}
+
+bool InvertIndex::remove(int32_t docid)
+{
+    vaddr_t *vsign_list = m_docid2signs->find(docid);
+    if (NULL == vsign_list)
+    {
+        return true;
+    }
+    SignList *sign_list = m_sign_pool.addr(*vsign_list);
+    SignList::iterator it = sign_list->begin();
+    SignList::iterator end = sign_list->end();
+    while (it != end)
+    {
+        uint64_t sign = *it;
+        SkipList *del_list = NULL;
+        vaddr_t *vdel_list = m_del_dict->find(sign);
+        if (vdel_list)
+        {
+            del_list = m_list_pool.addr(*vdel_list);
+        }
+        if (del_list)
+        {
+            if (!del_list->insert(docid, NULL))
+            {
+                WARNING("failed to remove docid[%d] for hash value[%lu]", docid, sign);
+                return false;
+            }
+        }
+        else
+        {
+            vaddr_t vlist = m_list_pool.alloc(&m_pool, 0);
+            SkipList *tmp = m_list_pool.addr(vlist);
+            if (NULL == tmp)
+            {
+                WARNING("failed to alloc SkipList");
+                return false;
+            }
+            if (!tmp->insert(docid, NULL) || !m_del_dict->insert(sign, vlist))
+            {
+                m_list_pool.free(vlist);
+                WARNING("failed to remove docid[%d] for hash value[%lu]", docid, sign);
+                return false;
+            }
+        }
+        vaddr_t *vadd_list = m_add_dict->find(sign);
+        if (vadd_list)
+        {
+            SkipList *add_list = m_list_pool.addr(*vadd_list);
+            add_list->remove(docid);
+            if (add_list->size() == 0)
+            {
+                m_add_dict->remove(sign);
+            }
+        }
+        ++it;
+    }
+    m_docid2signs->remove(docid);
     return true;
 }
 
