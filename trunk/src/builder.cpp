@@ -266,8 +266,8 @@ int build_index()
     {
         if (now != g_now_time)
         {
-            P_MYLOG("processe stats: update[forward=%u, invert=%u], delete[%u], in[%u ~ %u]",
-                    update_forward_count, update_invert_count, delete_count, now, g_now_time);
+            P_MYLOG("processe stats: sku_num[%d], update[forward=%u, invert=%u], delete[%u], in[%u ~ %u]",
+                    int(invert.docs_num()), update_forward_count, update_invert_count, delete_count, now, g_now_time);
 
             idx.recycle();
             invert.recycle();

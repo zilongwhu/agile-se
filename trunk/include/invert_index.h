@@ -86,6 +86,10 @@ class InvertIndex
         {
             m_pool.print_meta();
         }
+        size_t docs_num() const
+        {
+            return this->m_docid2signs->size();
+        }
     private:
         DocList *trigger(uint64_t sign, uint8_t type) const;
         bool insert(const char *keystr, uint8_t type, int32_t docid, void *payload);
