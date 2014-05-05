@@ -258,18 +258,36 @@ int build_index()
     uint32_t delete_count = 0;
     uint32_t update_invert_count = 0;
     uint32_t update_forward_count = 0;
+    uint32_t last_print_time = now;
 
     std::vector<invert_data_t> items;
     std::vector<std::pair<std::string, std::string> > kvs;
     while (1)
     {
+        if (now != g_now_time)
+        {
+            P_MYLOG("processe stats: update[forward=%u, invert=%u], delete[%u], in[%u ~ %u]",
+                    update_forward_count, update_invert_count, delete_count, now, g_now_time);
+
+            idx.recycle();
+            invert.recycle();
+
+            if (last_print_time + 5 < g_now_time)
+            {
+                idx.print_meta();
+                invert.print_meta();
+                last_print_time = g_now_time;
+            }
+
+            delete_count = 0;
+            update_invert_count = 0;
+            update_forward_count = 0;
+            now = g_now_time;
+        }
         int ret = reader.next();
         if (0 == ret)
         {
             ::usleep(10);
-            idx.print_meta();
-            invert.print_meta();
-            return -1;
         }
         else if (1 == ret)
         {
@@ -345,25 +363,12 @@ int build_index()
                     }
                     break;
             };
-            if (now != g_now_time)
-            {
-                P_MYLOG("processe stats: update[forward=%u, invert=%u], delete[%u], in[%u ~ %u]",
-                        update_forward_count, update_invert_count, delete_count, now, g_now_time);
-
-                idx.recycle();
-                invert.recycle();
-
-                delete_count = 0;
-                update_invert_count = 0;
-                update_forward_count = 0;
-                now = g_now_time;
-            }
         }
         else if (ret < 0)
         {
             FATAL("disk file error");
-            return -1;
+            break;
         }
     }
-    return 0;
+    return -1;
 }
