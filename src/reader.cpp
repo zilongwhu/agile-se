@@ -237,7 +237,7 @@ int IncReader::next()
 
         if (NULL == fp)
         {
-            WARNING("failed to open file[%s].", _filepath);
+            TRACE("failed to open file[%s].", _filepath);
             return 0; /* try again at some later time */
         }
         ::fclose(_fp);

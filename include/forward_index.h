@@ -72,6 +72,9 @@ class ForwardIndex
         void recycle()
         {
             m_pool.recycle();
+        }
+        void print_meta() const
+        {
             m_pool.print_meta();
         }
     private:
