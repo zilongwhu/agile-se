@@ -81,6 +81,7 @@ class InvertIndex
         void recycle()
         {
             m_pool.recycle();
+            m_pool.print_meta();
         }
     private:
         DocList *trigger(uint64_t sign, uint8_t type) const;

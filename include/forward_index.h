@@ -72,6 +72,7 @@ class ForwardIndex
         void recycle()
         {
             m_pool.recycle();
+            m_pool.print_meta();
         }
     private:
         struct cleanup_data_t
