@@ -21,6 +21,29 @@
 #include "fast_timer.h"
 #include "configure.h"
 
+void split(const std::string& s, const std::string& delim, std::vector<std::string> &elems)
+{
+    elems.clear();
+
+    size_t pos = 0;
+    size_t len = s.length();
+    size_t delim_len = delim.length();
+    if (delim_len == 0) return;
+    while (pos < len)
+    {
+        std::string::size_type find_pos = s.find(delim, pos);
+        if (find_pos == std::string::npos)
+        {
+            elems.push_back(s.substr(pos, len - pos));
+            return;
+        }
+        elems.push_back(s.substr(pos, find_pos - pos));
+        pos = find_pos + delim_len;
+    }
+    elems.push_back(std::string());
+    return;
+}
+
 int readline(FILE *fp, char *line, int num, bool ignoreRest)
 {
     if (NULL == fp || NULL == line || num <= 0)

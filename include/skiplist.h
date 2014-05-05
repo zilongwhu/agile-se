@@ -484,7 +484,7 @@ class TSkipList
         uint32_t rand_level() const
         {
             uint32_t level = 0;
-            for (uint32_t i = 0; i < M; ++i)
+            for (uint32_t i = 0; i + 1 < M; ++i)
             {
                 if (::rand() & 0x1)
                 {

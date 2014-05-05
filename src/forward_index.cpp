@@ -321,6 +321,7 @@ bool ForwardIndex::update(long id, const std::vector<std::pair<std::string, std:
         cJSON *json = cJSON_Parse(kvs[i].second.c_str());
         if (NULL == json)
         {
+            WARNING("failed to parse json[%s]", kvs[i].second.c_str());
             break;
         }
         tmp.push_back(std::make_pair(kvs[i].first, json));

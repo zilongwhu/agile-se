@@ -23,6 +23,17 @@
 #include	<string>
 #include	<vector>
 
+void split(const std::string& s, const std::string& delim, std::vector<std::string> &elems);
+int readline(FILE *fp, char *line, int num, bool ignoreRest);
+
+#ifndef P_MYLOG
+#define P_MYLOG( _fmt_, args... ) \
+    do{\
+        ::snprintf((log_buffer), (log_buffer_length), "[%s][%s][%d] " _fmt_, __FILE__, __FUNCTION__, __LINE__, ##args);\
+        reader.log(log_buffer);\
+    }while(0)
+#endif
+
 class IncReader
 {
     private:

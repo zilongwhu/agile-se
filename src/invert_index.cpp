@@ -22,6 +22,7 @@
 #include "difflist.h"
 #include "configure.h"
 #include "invert_index.h"
+#include "fast_timer.h"
 
 struct bl_head_t
 {
@@ -656,6 +657,8 @@ DocList *InvertIndex::trigger(uint64_t sign, uint8_t type) const
 
 bool InvertIndex::get_signs_by_docid(int32_t docid, std::vector<uint64_t> &signs) const
 {
+    signs.clear();
+
     vaddr_t *vlist = m_docid2signs->find(docid);
     if (NULL == vlist)
     {
@@ -676,6 +679,10 @@ bool InvertIndex::get_signs_by_docid(int32_t docid, std::vector<uint64_t> &signs
 
 bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, const std::string &json)
 {
+    if (json.length() == 0)
+    {
+        return this->insert(keystr, type, docid, (cJSON *)NULL);
+    }
     cJSON *cjson = cJSON_Parse(json.c_str());
     if (NULL == cjson)
     {
@@ -689,18 +696,30 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, const 
 
 bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, cJSON *json)
 {
-    if (NULL == keystr || !m_types.is_valid_type(type) || NULL == json)
+    if (NULL == keystr || !m_types.is_valid_type(type))
     {
-        WARNING("invalid parameter");
+        WARNING("invalid parameter: keystr[%p], type[%d]", keystr, int(type));
         return false;
     }
-    void *payload = m_types.types[type].parser->parse(json);
-    if (NULL == payload)
+    if (m_types.types[type].payload_len > 0)
     {
-        WARNING("failed to parse payload for invert type[%d]", int(type));
-        return false;
+        if (NULL == json)
+        {
+            WARNING("invert type[%d] must has payload", int(type));
+            return false;
+        }
+        void *payload = m_types.types[type].parser->parse(json);
+        if (NULL == payload)
+        {
+            WARNING("failed to parse payload for invert type[%d]", int(type));
+            return false;
+        }
+        return this->insert(keystr, type, docid, payload);
     }
-    return this->insert(keystr, type, docid, payload);
+    else
+    {
+        return this->insert(keystr, type, docid, (void *)NULL);
+    }
 }
 
 bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, void *payload)
@@ -720,7 +739,7 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, void *
             m_del_dict->remove(sign);
         }
     }
-    size_t payload_len = m_types.types[type].payload_len;
+    const uint32_t payload_len = m_types.types[type].payload_len;
     SkipList *add_list = NULL;
     vaddr_t *vadd_list = m_add_dict->find(sign);
     if (vadd_list)
@@ -788,6 +807,70 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, void *
             m_sign_pool.free(vlist);
             WARNING("failed to insert sign[%u] of hash value[%s:%d] for docid[%d]", sign, keystr, int(type), docid);
             return false;
+        }
+    }
+    return true;
+}
+
+bool InvertIndex::remove(uint64_t sign, int32_t docid)
+{
+    SkipList *del_list = NULL;
+    vaddr_t *vdel_list = m_del_dict->find(sign);
+    if (vdel_list)
+    {
+        del_list = m_list_pool.addr(*vdel_list);
+    }
+    if (del_list)
+    {
+        if (!del_list->insert(docid, NULL))
+        {
+            WARNING("failed to remove docid[%d] for hash value[%lu]", docid, sign);
+            return false;
+        }
+    }
+    else
+    {
+        vaddr_t vlist = m_list_pool.alloc(&m_pool, 0);
+        SkipList *tmp = m_list_pool.addr(vlist);
+        if (NULL == tmp)
+        {
+            WARNING("failed to alloc SkipList");
+            return false;
+        }
+        if (!tmp->insert(docid, NULL)
+                || !m_del_dict->insert(sign, vlist))
+        {
+            m_list_pool.free(vlist);
+            WARNING("failed to remove docid[%d] for hash value[%lu]", docid, sign);
+            return false;
+        }
+    }
+    SkipList *add_list = NULL;
+    vaddr_t *vadd_list = m_add_dict->find(sign);
+    if (vadd_list)
+    {
+        add_list = m_list_pool.addr(*vadd_list);
+    }
+    if (add_list)
+    {
+        add_list->remove(docid);
+        if (add_list->size() == 0)
+        {
+            m_add_dict->remove(sign);
+        }
+    }
+    SignList *sign_list = NULL;
+    vaddr_t *vsign_list = m_docid2signs->find(docid);
+    if (vsign_list)
+    {
+        sign_list = m_sign_pool.addr(*vsign_list);
+    }
+    if (sign_list)
+    {
+        sign_list->remove(sign);
+        if (sign_list->size() == 0)
+        {
+            m_docid2signs->remove(docid);
         }
     }
     return true;
@@ -864,7 +947,10 @@ bool InvertIndex::remove(const char *keystr, uint8_t type, int32_t docid)
 
 void InvertIndex::merge(uint64_t sign, uint8_t type)
 {
-    const int payload_len = m_types.types[type].payload_len;
+    long us = 0;
+    FastTimer timer;
+    timer.start();
+    const uint32_t payload_len = m_types.types[type].payload_len;
     DocList *list = this->trigger(sign, type);
     if (list)
     {
@@ -901,11 +987,19 @@ void InvertIndex::merge(uint64_t sign, uint8_t type)
                     }
                     docid = list->next();
                 }
-                m_add_dict->remove(sign);
-                m_del_dict->remove(sign);
-                if (!m_dict->insert(sign, mem))
+                if (m_dict->insert(sign, mem))
+                {
+                    m_add_dict->remove(sign);
+                    m_del_dict->remove(sign);
+
+                    timer.stop();
+                    us = timer.timeInUs();
+                    WARNING("merge sign[%lu] ok, type[%d], list len=%d, cost %ld us", sign, int(type), docnum, us);
+                }
+                else
                 {
                     ::free(mem);
+                    WARNING("failed to merge sign[%lu], type[%d]", sign, int(type));
                 }
             }
             else
@@ -919,6 +1013,10 @@ void InvertIndex::merge(uint64_t sign, uint8_t type)
             m_dict->remove(sign);
             m_add_dict->remove(sign);
             m_del_dict->remove(sign);
+
+            timer.stop();
+            us = timer.timeInUs();
+            WARNING("merge sign[%lu] ok, type[%d], list len=%d, cost %ld us", sign, int(type), docnum, us);
         }
         delete list;
     }
