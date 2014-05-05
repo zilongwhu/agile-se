@@ -267,6 +267,8 @@ int build_index()
         if (0 == ret)
         {
             ::usleep(10);
+            idx.print_meta();
+            invert.print_meta();
             return -1;
         }
         else if (1 == ret)
