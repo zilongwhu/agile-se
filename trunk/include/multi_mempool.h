@@ -20,6 +20,10 @@
 #include <ext/hash_map>
 #include "mempool.h"
 
+#ifndef AGILE_SE_PATE_SIZE
+#define AGILE_SE_PAGE_SIZE  (1024*1024) /* 1M */
+#endif
+
 class MultiMemoryPool
 {
     public:
@@ -30,10 +34,7 @@ class MultiMemoryPool
         MultiMemoryPool(const MultiMemoryPool &);
         MultiMemoryPool &operator =(const MultiMemoryPool &);
     public:
-        MultiMemoryPool()
-        {
-            m_max_items_num = 0;
-        }
+        MultiMemoryPool() { }
 
         ~MultiMemoryPool()
         {
@@ -47,10 +48,9 @@ class MultiMemoryPool
                 ++it;
             }
             m_pools.clear();
-            m_max_items_num = 0;
         }
 
-        int register_item(uint32_t elem_size, uint32_t page_size = 0)
+        int register_item(uint32_t elem_size)
         {
             if (elem_size <= 0)
             {
@@ -62,13 +62,8 @@ class MultiMemoryPool
             return 0;
         }
 
-        int init(uint32_t max_items_num)
+        int init(uint32_t /*max_items_num*/)
         {
-            if (max_items_num <= 0)
-            {
-                WARNING("invalid args: max_items_num=%u", max_items_num);
-                return -1;
-            }
             m_pools_end = m_pools.end();
             Map::iterator it = m_pools.begin();
             while (it != m_pools_end)
@@ -82,14 +77,14 @@ class MultiMemoryPool
                     WARNING("failed to alloc MemoryPool");
                     return -1;
                 }
-                if (0 > it->second->init(it->first, MemoryPool::adjust_elem_size(it->first) * max_items_num))
+                if (0 > it->second->init(it->first, AGILE_SE_PAGE_SIZE))
                 {
-                    WARNING("failed to init MemoryPool, elem_size=%u, max_items_num=%u", it->first, max_items_num);
+                    WARNING("failed to init MemoryPool, elem_size=%u, page_size=%u", it->first, AGILE_SE_PAGE_SIZE);
                     return -1;
                 }
                 ++it;
             }
-            WARNING("init ok, elems num=%u, max_items_num=%u", (uint32_t)m_pools.size(), max_items_num);
+            WARNING("init ok, elems num=%u, page_size=%u", (uint32_t)m_pools.size(), AGILE_SE_PAGE_SIZE);
             return 0;
         }
 
@@ -166,7 +161,6 @@ class MultiMemoryPool
     private:
         Map m_pools;
         Map::iterator m_pools_end;
-        uint32_t m_max_items_num;
 };
 
 #endif

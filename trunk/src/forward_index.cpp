@@ -216,24 +216,12 @@ int ForwardIndex::init(const char *path, const char *file)
         WARNING("failed to call init_pool");
         goto FAIL;
     }
-    int mem_page_size;
-    if (!config.get("mem_page_size", mem_page_size) || mem_page_size <= 0)
-    {
-        WARNING("failed to get mem_page_size");
-        goto FAIL;
-    }
-    if (m_pool.register_item(m_info_size, mem_page_size) < 0)
+    if (m_pool.register_item(m_info_size) < 0)
     {
         WARNING("failed to register info_size to mempool");
         goto FAIL;
     }
-    int node_page_size;
-    if (!config.get("node_page_size", node_page_size) || node_page_size <= 0)
-    {
-        WARNING("failed to get node_page_size");
-        goto FAIL;
-    }
-    if (m_pool.register_item(sizeof(NodePool::ObjectType), node_page_size) < 0)
+    if (m_pool.register_item(sizeof(NodePool::ObjectType)) < 0)
     {
         WARNING("failed to register node_size to mempool");
         goto FAIL;
@@ -276,8 +264,7 @@ int ForwardIndex::init(const char *path, const char *file)
             ++it;
         }
     }
-    WARNING("mem_page_size[%d], node_page_size[%d], max_items_num[%d], bucket_size[%d]",
-            mem_page_size, node_page_size, max_items_num, bucket_size);
+    WARNING("max_items_num[%d], bucket_size[%d]", max_items_num, bucket_size);
     return 0;
 FAIL:
     __gnu_cxx::hash_map<std::string, FieldDes>::iterator it = m_fields.begin();

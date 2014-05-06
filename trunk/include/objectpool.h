@@ -39,7 +39,7 @@ class TObjectPool
     public:
         static int init_pool(Pool *pool)
         {
-            return pool->register_item(sizeof(cleanup_bag_t), 1024*1024); /* 1M, 2^20 */
+            return pool->register_item(sizeof(cleanup_bag_t));
         }
     public:
         TObjectPool() { m_pool = NULL; }
@@ -65,7 +65,7 @@ class TObjectPool
                 {
                     WARNING("failed to register cleanup_bat_t");
                 }
-                else if (m_pool->register_item(sizeof(T), 1024*1024) < 0)
+                else if (m_pool->register_item(sizeof(T)) < 0)
                 {
                     WARNING("failed to register item");
                 }

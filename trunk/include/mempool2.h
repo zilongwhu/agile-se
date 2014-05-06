@@ -21,6 +21,10 @@
 #include <ext/hash_map>
 #include "log.h"
 
+#ifndef AGILE_SE_PATE_SIZE
+#define AGILE_SE_PAGE_SIZE  (1024*1024) /* 1M */
+#endif
+
 class BitsSpliter
 {
     public:
@@ -64,25 +68,22 @@ class VMemoryPool
         VMemoryPool() { }
         ~VMemoryPool() { this->clear(); }
 
-        int register_item(uint32_t elem_size, uint32_t page_size)
+        int register_item(uint32_t elem_size)
         {
-            if (elem_size < sizeof(vaddr_t) || page_size <= 0 || elem_size > page_size)
+            if (elem_size < sizeof(vaddr_t) || elem_size > AGILE_SE_PAGE_SIZE)
             {
-                WARNING("invalid args: elem_size=%u, page_size=%u", elem_size, page_size);
+                WARNING("invalid args: elem_size=%u", elem_size);
                 return -1;
             }
             for (size_t i = 0; i < m_registered_items.size(); ++i)
             {
-                if (m_registered_items[i].first == elem_size)
+                if (m_registered_items[i] == elem_size)
                 {
-                    WARNING("overwrite: elem_size=%u, old page_size=%u, new page_size=%u",
-                            elem_size, m_registered_items[i].second, page_size);
-                    m_registered_items[i].second = page_size;
                     return 1;
                 }
             }
-            m_registered_items.push_back(std::make_pair(elem_size, page_size));
-            WARNING("register item: elem_size=%u, page_size=%u", elem_size, page_size);
+            m_registered_items.push_back(elem_size);
+            WARNING("register item: elem_size=%u", elem_size);
             return 0;
         }
 
@@ -97,7 +98,7 @@ class VMemoryPool
             this->clear();
             WARNING("max_items_num=%u", max_items_num);
 
-            uint32_t second = log2(max_items_num - 1);
+            uint32_t second = log2(max_items_num);
             uint32_t first = 32 - second;
             m_bits.init(first, second);
 
@@ -114,11 +115,11 @@ class VMemoryPool
             uint32_t total = m_bits.offset_num();
             for (size_t i = 0; i < m_registered_items.size(); ++i)
             {
-                uint32_t elem_size = m_registered_items[i].first;
-                uint32_t page_size = m_registered_items[i].second;
+                uint32_t elem_size = m_registered_items[i];
+                uint32_t page_size = AGILE_SE_PAGE_SIZE;
                 uint32_t elems_num = page_size / elem_size;
 
-                second = log2(elems_num - 1);
+                second = log2(elems_num);
                 if (second > total)
                 {
                     second = total;
@@ -393,16 +394,17 @@ class VMemoryPool
 
         static int log2(uint32_t num)
         {
-            int bits = 0;
-            while (num > 0)
+            for (int i = 0; i < 32; ++i)
             {
-                ++bits;
-                num >>= 1;
+                if ((1u << i) >= num)
+                {
+                    return i > 1 ? i - 1 : 1;
+                }
             }
-            return bits;
+            return 31;
         }
     private:
-        std::vector<std::pair<uint32_t, uint32_t> > m_registered_items;
+        std::vector<uint32_t> m_registered_items;
         Map m_size2off;
         Map::iterator m_size2off_end;
 
