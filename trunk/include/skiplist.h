@@ -484,15 +484,9 @@ class TSkipList
         uint32_t rand_level() const
         {
             uint32_t level = 0;
-            for (uint32_t i = 0; i + 1 < M; ++i)
-            {
-                if (::rand() & 0x1)
-                {
-                    ++level;
-                }
-                else break;
-            }
-            return level;
+            while ((::rand() & 0xFFFF) < (0xFFFF >> 1))
+                level += 1;
+            return (level < M) ? level : M - 1;
         }
         uint32_t payload_offset(uint32_t level) const
         {
