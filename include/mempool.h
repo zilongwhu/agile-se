@@ -37,7 +37,7 @@ class MemoryPool
     public:
         MemoryPool()
         {
-            m_block_size = 0;
+            m_page_size = 0;
             m_elem_size = 0;
             m_alloc_num = 0;
             m_free_num = 0;
@@ -49,22 +49,22 @@ class MemoryPool
             this->clear();
         }
 
-        int init(size_t elem_size, size_t block_size)
+        int init(size_t elem_size, size_t page_size)
         {
             this->clear();
-            if (0 == elem_size || 0 ==  block_size)
+            if (0 == elem_size || 0 ==  page_size)
             {
-                WARNING("invalid args: elem_size=%u, block_size=%u", elem_size, block_size);
+                WARNING("invalid args: elem_size=%u, page_size=%u", elem_size, page_size);
                 return -1;
             }
             m_elem_size = adjust_elem_size(elem_size);
-            if (m_elem_size > block_size)
+            if (m_elem_size > page_size)
             {
-                WARNING("block_size is too small: elem_size=%u, block_size=%u", elem_size, block_size);
+                WARNING("page_size is too small: elem_size=%u, page_size=%u", elem_size, page_size);
                 return -2;
             }
-            m_block_size = block_size;
-            WARNING("init ok, elem_size=%u, block_size=%u", m_elem_size, m_block_size);
+            m_page_size = page_size;
+            WARNING("init ok, elem_size=%u, page_size=%u", m_elem_size, m_page_size);
             return 0;
         }
 
@@ -78,27 +78,27 @@ class MemoryPool
                 --m_free_num;
                 return ptr;
             }
-            void *block = ::malloc(m_block_size);
-            if (NULL == block)
+            void *page = ::malloc(m_page_size);
+            if (NULL == page)
             {
-                WARNING("failed to alloc new block, block_size=%u", m_block_size);
+                WARNING("failed to alloc new page, page_size=%u", m_page_size);
                 return NULL;
             }
             try
             {
-                m_blocks.push_back(block);
+                m_pages.push_back(page);
             }
             catch (...)
             {
-                ::free(block);
+                ::free(page);
 
-                WARNING("failed to push back new block, blocks_size=%u", (uint32_t)m_blocks.size());
+                WARNING("failed to push back new page, pages_size=%u", (uint32_t)m_pages.size());
                 return NULL;
             }
-            const int num = m_block_size / m_elem_size;
+            const int num = m_page_size / m_elem_size;
             for (int i = 0; i < num; ++i)
             {
-                element_t *elem = (element_t *)(((char *)block) + m_elem_size * i);
+                element_t *elem = (element_t *)(((char *)page) + m_elem_size * i);
                 elem->next = m_free_list;
                 m_free_list = elem;
             }
@@ -121,23 +121,23 @@ class MemoryPool
 
         void *addr(vaddr_t ptr) const { return ptr; }
 
-        size_t block_size() const { return m_block_size; }
+        size_t page_size() const { return m_page_size; }
         size_t elem_size() const { return m_elem_size; }
         size_t alloc_num() const { return m_alloc_num; }
         size_t free_num() const { return m_free_num; }
 
         size_t mem() const
         {
-            return (sizeof(void *) + m_block_size) * m_blocks.size();
+            return (sizeof(void *) + m_page_size) * m_pages.size();
         }
 
         void clear()
         {
-            for (size_t i = 0; i < m_blocks.size(); ++i)
+            for (size_t i = 0; i < m_pages.size(); ++i)
             {
-                ::free(m_blocks[i]);
+                ::free(m_pages[i]);
             }
-            m_blocks.clear();
+            m_pages.clear();
             m_alloc_num = 0;
             m_free_num = 0;
             m_free_list = NULL;
@@ -148,8 +148,8 @@ class MemoryPool
             return (elem_size + sizeof(void *) - 1)/sizeof(void *)*sizeof(void *);
         }
     private:
-        std::vector<void *> m_blocks;
-        size_t m_block_size;
+        std::vector<void *> m_pages;
+        size_t m_page_size;
         size_t m_elem_size;
 
         size_t m_alloc_num;

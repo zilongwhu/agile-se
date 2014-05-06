@@ -98,7 +98,7 @@ class TSkipList
             {
                 uint32_t size = sizeof(node_t) + sizeof(vaddr_t) * i
                     + (payload_len + sizeof(vaddr_t) - 1) / sizeof(vaddr_t) * sizeof(vaddr_t);
-                if (pool->register_item(size, 1024*1024) < 0)
+                if (pool->register_item(size) < 0)
                 {
                     WARNING("failed to register node, level=%d, size=%u, payload_len=%u", i, size, payload_len);
                     return -1;

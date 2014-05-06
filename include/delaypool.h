@@ -50,7 +50,6 @@ class TDelayPool
         {
             m_delayed_num = 0;
             m_delayed_time = 5;
-            m_node_page_size = 1024*1024;
             m_delayed_list.head = m_delayed_list.tail = 0;
         }
 
@@ -58,23 +57,17 @@ class TDelayPool
         {
             m_delayed_num = 0;
             m_delayed_time = 5;
-            m_node_page_size = 1024*1024;
             m_delayed_list.head = m_delayed_list.tail = 0;
         }
 
-        int register_item(uint32_t elem_size, uint32_t page_size)
+        int register_item(uint32_t elem_size)
         {
-            int ret = m_pool.register_item(elem_size, page_size);
-            if (!(ret < 0) && elem_size == sizeof(node_t))
-            {
-                m_node_page_size = page_size;
-            }
-            return ret;
+            return m_pool.register_item(elem_size);
         }
 
         int init(uint32_t max_items_num)
         {
-            int ret = m_pool.register_item(sizeof(node_t), m_node_page_size);
+            int ret = m_pool.register_item(sizeof(node_t));
             if (ret < 0)
             {
                 WARNING("failed to register for node_t");
@@ -180,7 +173,6 @@ class TDelayPool
 
         size_t m_delayed_num;
         int m_delayed_time;
-        uint32_t m_node_page_size;
 
         queue_t m_delayed_list;
 };

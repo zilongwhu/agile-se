@@ -432,57 +432,27 @@ int InvertIndex::init(const char *path, const char *file)
         WARNING("failed to get merge_threshold");
         return -1;
     }
-    int node_page_size;
-    if (!config.get("node_page_size", node_page_size) || node_page_size <= 0)
-    {
-        WARNING("failed to get node_page_size");
-        return -1;
-    }
-    if (m_pool.register_item(sizeof(NodePool::ObjectType), node_page_size) < 0)
+    if (m_pool.register_item(sizeof(NodePool::ObjectType)) < 0)
     {
         WARNING("failed to register node_page_size to mempool");
         return -1;
     }
-    int vnode_page_size;
-    if (!config.get("vnode_page_size", vnode_page_size) || vnode_page_size <= 0)
-    {
-        WARNING("failed to get vnode_page_size");
-        return -1;
-    }
-    if (m_pool.register_item(sizeof(VNodePool::ObjectType), vnode_page_size) < 0)
+    if (m_pool.register_item(sizeof(VNodePool::ObjectType)) < 0)
     {
         WARNING("failed to register vnode_page_size to mempool");
         return -1;
     }
-    int snode_page_size;
-    if (!config.get("snode_page_size", snode_page_size) || snode_page_size <= 0)
-    {
-        WARNING("failed to get snode_page_size");
-        return -1;
-    }
-    if (m_pool.register_item(sizeof(SNodePool::ObjectType), snode_page_size) < 0)
+    if (m_pool.register_item(sizeof(SNodePool::ObjectType)) < 0)
     {
         WARNING("failed to register snode_page_size to mempool");
         return -1;
     }
-    int list_page_size;
-    if (!config.get("list_page_size", list_page_size) || list_page_size <= 0)
-    {
-        WARNING("failed to get list_page_size");
-        return -1;
-    }
-    if (m_pool.register_item(sizeof(ListPool::ObjectType), list_page_size) < 0)
+    if (m_pool.register_item(sizeof(ListPool::ObjectType)) < 0)
     {
         WARNING("failed to register list_page_size to mempool");
         return -1;
     }
-    int sign_page_size;
-    if (!config.get("sign_page_size", sign_page_size) || sign_page_size <= 0)
-    {
-        WARNING("failed to get sign_page_size");
-        return -1;
-    }
-    if (m_pool.register_item(sizeof(SignPool::ObjectType), sign_page_size) < 0)
+    if (m_pool.register_item(sizeof(SignPool::ObjectType)) < 0)
     {
         WARNING("failed to register sign_page_size to mempool");
         return -1;
