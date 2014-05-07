@@ -35,7 +35,7 @@ struct bl_head_t
 class BigList: public DocList
 {
     public:
-        BigList(uint64_t sign, void *data)
+        BigList(uint32_t sign, void *data)
         {
             m_sign = sign;
             memcpy(&m_head, data, sizeof m_head);
@@ -142,7 +142,7 @@ class BigList: public DocList
             return NULL;
         }
     private:
-        uint64_t m_sign;
+        uint32_t m_sign;
         bl_head_t m_head;
         int32_t *m_docids;
         int8_t *m_payloads;
@@ -154,7 +154,7 @@ class AddList: public DocList
     public:
         typedef InvertIndex::SkipList::iterator Iterator;
 
-        AddList(uint64_t sign, uint8_t type, uint16_t payload_len, Iterator it)
+        AddList(uint32_t sign, uint8_t type, uint16_t payload_len, Iterator it)
             : m_it(it), m_it_c(it), m_end(0, it.list())
         {
             m_sign = sign;
@@ -203,7 +203,7 @@ class AddList: public DocList
             return NULL;
         }
     private:
-        uint64_t m_sign;
+        uint32_t m_sign;
         uint8_t m_type;
         uint16_t m_payload_len;
         Iterator m_it;
@@ -405,8 +405,9 @@ int InvertIndex::init(const char *path, const char *file)
     if (NodePool::init_pool(&m_pool) < 0
             || VNodePool::init_pool(&m_pool) < 0
             || SNodePool::init_pool(&m_pool) < 0
-            || ListPool::init_pool(&m_pool) < 0
-            || SignPool::init_pool(&m_pool) < 0)
+            || INodePool::init_pool(&m_pool) < 0
+            || SkipListPool::init_pool(&m_pool) < 0
+            || IDListPool::init_pool(&m_pool) < 0)
     {
         WARNING("failed to call init_pool");
         return -1;
@@ -434,27 +435,32 @@ int InvertIndex::init(const char *path, const char *file)
     }
     if (m_pool.register_item(sizeof(NodePool::ObjectType)) < 0)
     {
-        WARNING("failed to register node_page_size to mempool");
+        WARNING("failed to register node to mempool");
         return -1;
     }
     if (m_pool.register_item(sizeof(VNodePool::ObjectType)) < 0)
     {
-        WARNING("failed to register vnode_page_size to mempool");
+        WARNING("failed to register vnode to mempool");
         return -1;
     }
     if (m_pool.register_item(sizeof(SNodePool::ObjectType)) < 0)
     {
-        WARNING("failed to register snode_page_size to mempool");
+        WARNING("failed to register snode to mempool");
         return -1;
     }
-    if (m_pool.register_item(sizeof(ListPool::ObjectType)) < 0)
+    if (m_pool.register_item(sizeof(INodePool::ObjectType)) < 0)
     {
-        WARNING("failed to register list_page_size to mempool");
+        WARNING("failed to register inode to mempool");
         return -1;
     }
-    if (m_pool.register_item(sizeof(SignPool::ObjectType)) < 0)
+    if (m_pool.register_item(sizeof(SkipListPool::ObjectType)) < 0)
     {
-        WARNING("failed to register sign_page_size to mempool");
+        WARNING("failed to register skiplist to mempool");
+        return -1;
+    }
+    if (m_pool.register_item(sizeof(IDListPool::ObjectType)) < 0)
+    {
+        WARNING("failed to register idlist to mempool");
         return -1;
     }
     int max_items_num;
@@ -471,8 +477,26 @@ int InvertIndex::init(const char *path, const char *file)
     m_node_pool.init(&m_pool);
     m_vnode_pool.init(&m_pool);
     m_snode_pool.init(&m_pool);
-    m_list_pool.init(&m_pool);
-    m_sign_pool.init(&m_pool);
+    m_inode_pool.init(&m_pool);
+    m_skiplist_pool.init(&m_pool);
+    m_idlist_pool.init(&m_pool);
+    int signdict_hash_size;
+    if (!config.get("signdict_hash_size", signdict_hash_size) || signdict_hash_size <= 0)
+    {
+        WARNING("failed to get signdict_hash_size");
+        return -1;
+    }
+    int signdict_buffer_size;
+    if (!config.get("signdict_buffer_size", signdict_buffer_size) || signdict_buffer_size <= 0)
+    {
+        WARNING("failed to get signdict_buffer_size");
+        return -1;
+    }
+    if (m_sign2id.init(&m_snode_pool, signdict_hash_size, signdict_buffer_size) < 0)
+    {
+        WARNING("failed to init sign2id dict");
+        return -1;
+    }
     int dict_hash_size;
     if (!config.get("dict_hash_size", dict_hash_size) || dict_hash_size <= 0)
     {
@@ -528,7 +552,16 @@ int InvertIndex::init(const char *path, const char *file)
         return -1;
     }
     m_docid2signs->set_pool(&m_vnode_pool);
-    m_docid2signs->set_cleanup(cleanup_sign_node, (intptr_t)this);
+    m_docid2signs->set_cleanup(cleanup_id_node, (intptr_t)this);
+
+    m_types.set_sign_dict(&m_sign2id);
+
+    WARNING("signdict_hash_size=%u", signdict_hash_size);
+    WARNING("signdict_buffer_size=%u", signdict_buffer_size);
+    WARNING("dict_hash_size=%u", dict_hash_size);
+    WARNING("add_dict_hash_size=%u", add_dict_hash_size);
+    WARNING("del_dict_hash_size=%u", del_dict_hash_size);
+    WARNING("docid2signs_hash_size=%u", docid2signs_hash_size);
     WARNING("init ok");
     return 0;
 }
@@ -540,11 +573,11 @@ DocList *InvertIndex::trigger(const char *keystr, uint8_t type) const
         WARNING("invalid parameter");
         return NULL;
     }
-    uint64_t sign = m_types.get_sign(keystr, type);
+    uint32_t sign = m_types.get_sign(keystr, type);
     return this->trigger(sign, type);
 }
 
-DocList *InvertIndex::trigger(uint64_t sign, uint8_t type) const
+DocList *InvertIndex::trigger(uint32_t sign, uint8_t type) const
 {
     void **big = m_dict->find(sign);
     vaddr_t *vadd = m_add_dict->find(sign);
@@ -553,13 +586,13 @@ DocList *InvertIndex::trigger(uint64_t sign, uint8_t type) const
     {
         return NULL;
     }
-    SkipList *add = m_list_pool.addr(*vadd);
+    SkipList *add = m_skiplist_pool.addr(*vadd);
     SkipList *del = NULL;
 
     vaddr_t *vdel = m_del_dict->find(sign);
     if (NULL != vdel)
     {
-        del = m_list_pool.addr(*vdel);
+        del = m_skiplist_pool.addr(*vdel);
     }
 
     BigList *bl = NULL;
@@ -625,7 +658,7 @@ DocList *InvertIndex::trigger(uint64_t sign, uint8_t type) const
     return NULL;
 }
 
-bool InvertIndex::get_signs_by_docid(int32_t docid, std::vector<uint64_t> &signs) const
+bool InvertIndex::get_signs_by_docid(int32_t docid, std::vector<uint32_t> &signs) const
 {
     signs.clear();
 
@@ -634,10 +667,10 @@ bool InvertIndex::get_signs_by_docid(int32_t docid, std::vector<uint64_t> &signs
     {
         return false;
     }
-    SignList *list = m_sign_pool.addr(*vlist);
+    IDList *list = m_idlist_pool.addr(*vlist);
     signs.reserve(list->size());
-    SignList::iterator it = list->begin();
-    SignList::iterator end = list->end();
+    IDList::iterator it = list->begin();
+    IDList::iterator end = list->end();
     while (it != end)
     {
         signs.push_back(*it);
@@ -693,13 +726,13 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, cJSON 
 
 bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, void *payload)
 {
-    uint64_t sign = m_types.get_sign(keystr, type);
+    uint32_t sign = m_types.record_sign(keystr, type);
     const uint32_t payload_len = m_types.types[type].payload_len;
     SkipList *add_list = NULL;
     vaddr_t *vadd_list = m_add_dict->find(sign);
     if (vadd_list)
     {
-        add_list = m_list_pool.addr(*vadd_list);
+        add_list = m_skiplist_pool.addr(*vadd_list);
     }
     if (add_list)
     {
@@ -720,8 +753,8 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, void *
     }
     else
     {
-        vaddr_t vlist = m_list_pool.alloc(&m_pool, payload_len);
-        SkipList *tmp = m_list_pool.addr(vlist);
+        vaddr_t vlist = m_skiplist_pool.alloc(&m_pool, payload_len);
+        SkipList *tmp = m_skiplist_pool.addr(vlist);
         if (NULL == tmp)
         {
             WARNING("failed to alloc SkipList");
@@ -729,7 +762,7 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, void *
         }
         if (!tmp->insert(docid, payload) || !m_add_dict->insert(sign, vlist))
         {
-            m_list_pool.free(vlist);
+            m_skiplist_pool.free(vlist);
             WARNING("failed to insert docid[%d] for hash value[%s:%d]", docid, keystr, int(type));
             return false;
         }
@@ -737,22 +770,22 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, void *
     vaddr_t *vdel_list = m_del_dict->find(sign);
     if (vdel_list)
     {
-        SkipList *del_list = m_list_pool.addr(*vdel_list);
+        SkipList *del_list = m_skiplist_pool.addr(*vdel_list);
         del_list->remove(docid);
         if (del_list->size() == 0)
         {
             m_del_dict->remove(sign);
         }
     }
-    SignList *sign_list = NULL;
-    vaddr_t *vsign_list = m_docid2signs->find(docid);
-    if (vsign_list)
+    IDList *idlist = NULL;
+    vaddr_t *vidlist = m_docid2signs->find(docid);
+    if (vidlist)
     {
-        sign_list = m_sign_pool.addr(*vsign_list);
+        idlist = m_idlist_pool.addr(*vidlist);
     }
-    if (sign_list)
+    if (idlist)
     {
-        if (!sign_list->insert(sign))
+        if (!idlist->insert(sign))
         {
             WARNING("failed to insert sign[%u] of hash value[%s:%d] for docid[%d]", sign, keystr, int(type), docid);
             return false;
@@ -760,16 +793,16 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, void *
     }
     else
     {
-        vaddr_t vlist = m_sign_pool.alloc(&m_snode_pool);
-        SignList *tmp = m_sign_pool.addr(vlist);
+        vaddr_t vlist = m_idlist_pool.alloc(&m_inode_pool);
+        IDList *tmp = m_idlist_pool.addr(vlist);
         if (NULL == tmp)
         {
-            WARNING("failed to alloc SignList");
+            WARNING("failed to alloc IDList");
             return false;
         }
         if (!tmp->insert(sign) || !m_docid2signs->insert(docid, vlist))
         {
-            m_sign_pool.free(vlist);
+            m_idlist_pool.free(vlist);
             WARNING("failed to insert sign[%u] of hash value[%s:%d] for docid[%d]", sign, keystr, int(type), docid);
             return false;
         }
@@ -779,12 +812,12 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, void *
 
 bool InvertIndex::remove(const char *keystr, uint8_t type, int32_t docid)
 {
-    uint64_t sign = m_types.get_sign(keystr, type);
+    uint32_t sign = m_types.record_sign(keystr, type);
     SkipList *del_list = NULL;
     vaddr_t *vdel_list = m_del_dict->find(sign);
     if (vdel_list)
     {
-        del_list = m_list_pool.addr(*vdel_list);
+        del_list = m_skiplist_pool.addr(*vdel_list);
     }
     if (del_list)
     {
@@ -800,8 +833,8 @@ bool InvertIndex::remove(const char *keystr, uint8_t type, int32_t docid)
     }
     else
     {
-        vaddr_t vlist = m_list_pool.alloc(&m_pool, 0);
-        SkipList *tmp = m_list_pool.addr(vlist);
+        vaddr_t vlist = m_skiplist_pool.alloc(&m_pool, 0);
+        SkipList *tmp = m_skiplist_pool.addr(vlist);
         if (NULL == tmp)
         {
             WARNING("failed to alloc SkipList");
@@ -809,7 +842,7 @@ bool InvertIndex::remove(const char *keystr, uint8_t type, int32_t docid)
         }
         if (!tmp->insert(docid, NULL) || !m_del_dict->insert(sign, vlist))
         {
-            m_list_pool.free(vlist);
+            m_skiplist_pool.free(vlist);
             WARNING("failed to remove docid[%d] for hash value[%s:%d]", docid, keystr, int(type));
             return false;
         }
@@ -817,19 +850,19 @@ bool InvertIndex::remove(const char *keystr, uint8_t type, int32_t docid)
     vaddr_t *vadd_list = m_add_dict->find(sign);
     if (vadd_list)
     {
-        SkipList *add_list = m_list_pool.addr(*vadd_list);
+        SkipList *add_list = m_skiplist_pool.addr(*vadd_list);
         add_list->remove(docid);
         if (add_list->size() == 0)
         {
             m_add_dict->remove(sign);
         }
     }
-    vaddr_t *vsign_list = m_docid2signs->find(docid);
-    if (vsign_list)
+    vaddr_t *vidlist = m_docid2signs->find(docid);
+    if (vidlist)
     {
-        SignList *sign_list = m_sign_pool.addr(*vsign_list);
-        sign_list->remove(sign);
-        if (sign_list->size() == 0)
+        IDList *idlist = m_idlist_pool.addr(*vidlist);
+        idlist->remove(sign);
+        if (idlist->size() == 0)
         {
             m_docid2signs->remove(docid);
         }
@@ -839,22 +872,22 @@ bool InvertIndex::remove(const char *keystr, uint8_t type, int32_t docid)
 
 bool InvertIndex::remove(int32_t docid)
 {
-    vaddr_t *vsign_list = m_docid2signs->find(docid);
-    if (NULL == vsign_list)
+    vaddr_t *vidlist = m_docid2signs->find(docid);
+    if (NULL == vidlist)
     {
         return true;
     }
-    SignList *sign_list = m_sign_pool.addr(*vsign_list);
-    SignList::iterator it = sign_list->begin();
-    SignList::iterator end = sign_list->end();
+    IDList *idlist = m_idlist_pool.addr(*vidlist);
+    IDList::iterator it = idlist->begin();
+    IDList::iterator end = idlist->end();
     while (it != end)
     {
-        uint64_t sign = *it;
+        uint32_t sign = *it;
         SkipList *del_list = NULL;
         vaddr_t *vdel_list = m_del_dict->find(sign);
         if (vdel_list)
         {
-            del_list = m_list_pool.addr(*vdel_list);
+            del_list = m_skiplist_pool.addr(*vdel_list);
         }
         if (del_list)
         {
@@ -866,8 +899,8 @@ bool InvertIndex::remove(int32_t docid)
         }
         else
         {
-            vaddr_t vlist = m_list_pool.alloc(&m_pool, 0);
-            SkipList *tmp = m_list_pool.addr(vlist);
+            vaddr_t vlist = m_skiplist_pool.alloc(&m_pool, 0);
+            SkipList *tmp = m_skiplist_pool.addr(vlist);
             if (NULL == tmp)
             {
                 WARNING("failed to alloc SkipList");
@@ -875,7 +908,7 @@ bool InvertIndex::remove(int32_t docid)
             }
             if (!tmp->insert(docid, NULL) || !m_del_dict->insert(sign, vlist))
             {
-                m_list_pool.free(vlist);
+                m_skiplist_pool.free(vlist);
                 WARNING("failed to remove docid[%d] for hash value[%lu]", docid, sign);
                 return false;
             }
@@ -883,7 +916,7 @@ bool InvertIndex::remove(int32_t docid)
         vaddr_t *vadd_list = m_add_dict->find(sign);
         if (vadd_list)
         {
-            SkipList *add_list = m_list_pool.addr(*vadd_list);
+            SkipList *add_list = m_skiplist_pool.addr(*vadd_list);
             add_list->remove(docid);
             if (add_list->size() == 0)
             {
@@ -896,7 +929,7 @@ bool InvertIndex::remove(int32_t docid)
     return true;
 }
 
-void InvertIndex::merge(uint64_t sign, uint8_t type)
+void InvertIndex::merge(uint32_t sign, uint8_t type)
 {
     long us = 0;
     FastTimer timer;
@@ -945,12 +978,12 @@ void InvertIndex::merge(uint64_t sign, uint8_t type)
 
                     timer.stop();
                     us = timer.timeInUs();
-                    WARNING("merge sign[%lu] ok, type[%d], list len=%d, cost %ld us", sign, int(type), docnum, us);
+                    WARNING("merge sign[%u] ok, type[%d], list len=%d, cost %ld us", sign, int(type), docnum, us);
                 }
                 else
                 {
                     ::free(mem);
-                    WARNING("failed to merge sign[%lu], type[%d]", sign, int(type));
+                    WARNING("failed to merge sign[%u], type[%d]", sign, int(type));
                 }
             }
             else
@@ -967,7 +1000,7 @@ void InvertIndex::merge(uint64_t sign, uint8_t type)
 
             timer.stop();
             us = timer.timeInUs();
-            WARNING("merge sign[%lu] ok, type[%d], list len=%d, cost %ld us", sign, int(type), docnum, us);
+            WARNING("merge sign[%u] ok, type[%d], list len=%d, cost %ld us", sign, int(type), docnum, us);
         }
         delete list;
     }
@@ -997,11 +1030,11 @@ void InvertIndex::cleanup_diff_node(VHash::node_t *node, intptr_t arg)
     }
     if (node->value)
     {
-        ptr->m_list_pool.free(node->value);
+        ptr->m_skiplist_pool.free(node->value);
     }
 }
 
-void InvertIndex::cleanup_sign_node(VHash::node_t *node, intptr_t arg)
+void InvertIndex::cleanup_id_node(VHash::node_t *node, intptr_t arg)
 {
     InvertIndex *ptr = (InvertIndex *)arg;
     if (NULL == ptr)
@@ -1011,7 +1044,7 @@ void InvertIndex::cleanup_sign_node(VHash::node_t *node, intptr_t arg)
     }
     if (node->value)
     {
-        ptr->m_sign_pool.free(node->value);
+        ptr->m_idlist_pool.free(node->value);
     }
 }
 

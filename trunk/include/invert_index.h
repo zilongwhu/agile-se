@@ -28,6 +28,7 @@
 #include "sortlist.h"
 #include "invert_type.h"
 #include "doclist.h"
+#include "signdict.h"
 
 class InvertIndex
 {
@@ -41,18 +42,20 @@ class InvertIndex
         typedef TDelayPool<VMemoryPool> Pool;
         typedef Pool::vaddr_t vaddr_t;
 
-        typedef HashTable<uint64_t, void *> Hash;
+        typedef HashTable<uint32_t, void *> Hash;
         typedef Hash::ObjectPool NodePool;
 
-        typedef HashTable<uint64_t, vaddr_t> VHash;
+        typedef HashTable<uint32_t, vaddr_t> VHash;
         typedef VHash::ObjectPool VNodePool;
 
-        typedef TSkipList<VMemoryPool> SkipList;
-        typedef TObjectPool<SkipList, VMemoryPool> ListPool;
+        typedef SignDict::ObjectPool SNodePool;
 
-        typedef SortList<uint64_t, VMemoryPool> SignList;
-        typedef TObjectPool<SignList, VMemoryPool> SignPool;
-        typedef SignList::ObjectPool SNodePool;
+        typedef TSkipList<VMemoryPool> SkipList;
+        typedef TObjectPool<SkipList, VMemoryPool> SkipListPool;
+
+        typedef SortList<uint32_t, VMemoryPool> IDList;
+        typedef IDList::ObjectPool INodePool;
+        typedef TObjectPool<IDList, VMemoryPool> IDListPool;
     private:
         InvertIndex(const InvertIndex &);
         InvertIndex &operator =(const InvertIndex &);
@@ -71,7 +74,7 @@ class InvertIndex
 
         DocList *parse(const std::string &query, const std::vector<term_t> terms) const;
         DocList *trigger(const char *keystr, uint8_t type) const;
-        bool get_signs_by_docid(int32_t docid, std::vector<uint64_t> &signs) const;
+        bool get_signs_by_docid(int32_t docid, std::vector<uint32_t> &signs) const;
 
         bool insert(const char *keystr, uint8_t type, int32_t docid, const std::string &json);
         bool insert(const char *keystr, uint8_t type, int32_t docid, cJSON *json);
@@ -91,13 +94,13 @@ class InvertIndex
             return this->m_docid2signs->size();
         }
     private:
-        DocList *trigger(uint64_t sign, uint8_t type) const;
+        DocList *trigger(uint32_t sign, uint8_t type) const;
         bool insert(const char *keystr, uint8_t type, int32_t docid, void *payload);
-        void merge(uint64_t sign, uint8_t type);
+        void merge(uint32_t sign, uint8_t type);
     private:
         static void cleanup_node(Hash::node_t *node, intptr_t arg);
         static void cleanup_diff_node(VHash::node_t *node, intptr_t arg);
-        static void cleanup_sign_node(VHash::node_t *node, intptr_t arg);
+        static void cleanup_id_node(VHash::node_t *node, intptr_t arg);
     private:
         InvertTypes m_types;
         int32_t m_merge_threshold;
@@ -106,9 +109,11 @@ class InvertIndex
         NodePool m_node_pool;
         VNodePool m_vnode_pool;
         SNodePool m_snode_pool;
-        ListPool m_list_pool;
-        SignPool m_sign_pool;
+        INodePool m_inode_pool;
+        SkipListPool m_skiplist_pool;
+        IDListPool m_idlist_pool;
 
+        SignDict m_sign2id;
         Hash *m_dict;
         VHash *m_add_dict;
         VHash *m_del_dict;
