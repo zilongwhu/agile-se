@@ -933,7 +933,10 @@ void InvertIndex::merge(uint32_t sign, uint8_t type)
 {
     long us = 0;
     FastTimer timer;
+
     timer.start();
+    std::string word;
+    m_sign2id.find(sign, word);
     const uint32_t payload_len = m_types.types[type].payload_len;
     DocList *list = this->trigger(sign, type);
     if (list)
@@ -978,12 +981,12 @@ void InvertIndex::merge(uint32_t sign, uint8_t type)
 
                     timer.stop();
                     us = timer.timeInUs();
-                    WARNING("merge sign[%u] ok, type[%d], list len=%d, cost %ld us", sign, int(type), docnum, us);
+                    WARNING("merge sign[%u] ok, type[%d], word[%s], list len=%d, cost %ld us", sign, int(type), word.c_str(), docnum, us);
                 }
                 else
                 {
                     ::free(mem);
-                    WARNING("failed to merge sign[%u], type[%d]", sign, int(type));
+                    WARNING("failed to merge sign[%u], type[%d], word[%s]", sign, int(type), word.c_str());
                 }
             }
             else
@@ -1000,7 +1003,7 @@ void InvertIndex::merge(uint32_t sign, uint8_t type)
 
             timer.stop();
             us = timer.timeInUs();
-            WARNING("merge sign[%u] ok, type[%d], list len=%d, cost %ld us", sign, int(type), docnum, us);
+            WARNING("merge sign[%u] ok, type[%d], word[%s], list len=%d, cost %ld us", sign, int(type), word.c_str(), docnum, us);
         }
         delete list;
     }
