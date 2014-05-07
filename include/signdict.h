@@ -17,6 +17,8 @@
 #ifndef __AGILE_SE_SIGN_DICT_H__
 #define __AGILE_SE_SIGN_DICT_H__
 
+#include <string>
+#include <vector>
 #include "hashtable.h"
 
 class SignDict
@@ -84,6 +86,7 @@ class SignDict
                         pool, bucket_size, buffer_size);
                 return -1;
             }
+            m_ids.reserve(bucket_size);
             m_dict = new Hash(bucket_size);
             if (NULL == m_dict)
             {
@@ -120,6 +123,18 @@ class SignDict
             return false;
         }
 
+        bool find(uint32_t id, std::string &word) const /* do not use this func */
+        {
+            --id;
+            if (id >= m_ids.size())
+            {
+                word.clear();
+                return false;
+            }
+            word = std::string(m_buffer + m_ids[id].first, m_ids[id].second);
+            return true;
+        }
+
         bool find_or_insert(uint64_t sign, const char *word, uint32_t len, uint32_t &id) /* not thread safe */
         {
             if (NULL == word || 0 == len)
@@ -153,6 +168,8 @@ class SignDict
                     m_buffer = buffer;
                     m_buffer_size <<= 1;
                 }
+                m_ids.reserve(m_ids.size() + 1);
+
                 value_t value;
                 value.id = m_max_id;
                 value.offset = m_buffer_pos;
@@ -165,6 +182,7 @@ class SignDict
                 ::memcpy(m_buffer + m_buffer_pos, word, len);
                 m_buffer_pos += len;
                 id = m_max_id++;
+                m_ids.push_back(std::make_pair(value.offset, value.length));
                 WARNING("insert word[%*s] ok, id=%u, sign=%lu", len, word, id, sign);
             }
             return true;
@@ -177,6 +195,7 @@ class SignDict
         uint32_t m_max_id;
         uint32_t m_buffer_pos;
         uint32_t m_buffer_size;
+        std::vector<std::pair<uint32_t, uint32_t> > m_ids;
 };
 
 #endif
