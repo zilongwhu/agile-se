@@ -27,6 +27,7 @@
 #include "delaypool.h"
 #include "objectpool.h"
 #include "skiplist.h"
+#include "signdict.h"
 
 int nums[10000];
 

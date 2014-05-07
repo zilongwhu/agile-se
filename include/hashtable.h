@@ -27,7 +27,7 @@ namespace __gnu_cxx
 {
     template<> struct hash<std::string>
     {
-        size_t operator()(const std::string __s) const
+        size_t operator()(const std::string &__s) const
         {
             hash<const char *> tmp;
             return tmp(__s.c_str());

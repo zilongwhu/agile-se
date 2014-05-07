@@ -41,7 +41,7 @@ class InvertStrategy
             int8_t result[512];                 /* 策略数据 */
             uint16_t length;                    /* 数据长度 */
             uint8_t type;                       /* 倒排类型 */
-            uint64_t sign;                      /* 倒排签名 */
+            uint32_t sign;                      /* 倒排签名 */
             data_t data;
         };
 
