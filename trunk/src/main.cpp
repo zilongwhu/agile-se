@@ -28,6 +28,7 @@
 #include "objectpool.h"
 #include "skiplist.h"
 #include "signdict.h"
+#include "inc_builder.h"
 
 int nums[10000];
 
@@ -70,31 +71,33 @@ struct A
     }
 };
 
-//class TermParser: public InvertParser
-//{
-//    public:
-//        TermParser() { memset(m_bytes, 0, sizeof m_bytes); }
-//        void *parse(cJSON *json)
-//        {
-//            return m_bytes;
-//        }
-//    private:
-//        char m_bytes[12];
-//};
-//
-//class DummyParser: public InvertParser
-//{
-//    public:
-//        void *parse(cJSON *json)
-//        {
-//            return NULL;
-//        }
-//};
-//
-//DEFINE_INVERT_PARSER(TermParser);
-//DEFINE_INVERT_PARSER(DummyParser);
+class TermParser: public InvertParser
+{
+    public:
+        TermParser() { memset(m_bytes, 0, sizeof m_bytes); }
+        void *parse(cJSON *json)
+        {
+            return m_bytes;
+        }
+    private:
+        char m_bytes[16];
+};
 
-int build_index();
+class DummyParser: public InvertParser
+{
+    public:
+        void *parse(cJSON *json)
+        {
+            return NULL;
+        }
+};
+
+DEFINE_INVERT_PARSER(TermParser);
+DEFINE_INVERT_PARSER(DummyParser);
+
+ForwardIndex forward;
+InvertIndex invert;
+IncReader reader;
 
 int main(int argc, char *argv[])
 {
@@ -324,7 +327,25 @@ int main(int argc, char *argv[])
 //
 //    WARNING("size=%u, cur_level=%u", sl.size(), sl.cur_level());
 
-    build_index();
+    REGISTER_INVERT_PARSER(TermParser);
+    REGISTER_INVERT_PARSER(DummyParser);
+
+    init_time_updater();
+
+    int ret = forward.init("./conf", "fields.conf")
+        | invert.init("./conf", "invert.conf")
+        | reader.init("./conf", "inc.meta");
+    if (ret < 0)
+    {
+        return -1;
+    }
+
+    inc_builder_t args;
+    args.forward = &forward;
+    args.invert = &invert;
+    args.reader = &reader;
+
+    inc_build_index(&args);
 
     return 0;
 }

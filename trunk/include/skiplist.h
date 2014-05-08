@@ -141,6 +141,36 @@ class TSkipList
         uint32_t cur_level() const { return m_cur_level; }
         uint32_t size() const { return m_size; }
 
+        size_t mem_used(uint32_t *p_levels = NULL) const
+        {
+            uint32_t levels[M];
+            for (uint32_t i = 0; i < M; ++i)
+            {
+                levels[i] = 0;
+            }
+
+            node_t *node;
+            vaddr_t cur = m_head[0];
+            while (0 != cur)
+            {
+                node = (node_t *)m_pool->addr(cur);
+                ++levels[node->level];
+                cur = node->next[0];
+            }
+
+            size_t mem = sizeof(*this);
+            for (uint32_t i = 0; i < M; ++i)
+            {
+                mem += levels[i] * this->node_size(i);
+
+                if (p_levels)
+                {
+                    p_levels[i] += levels[i];
+                }
+            }
+            return mem;
+        }
+
         iterator begin() const
         {
             return iterator(m_head[0], this);

@@ -66,6 +66,78 @@ class HashTable
 
         typedef TObjectPool<node_t, TMemoryPool> ObjectPool;
         typedef typename ObjectPool::cleanup_fun_t cleanup_fun_t;
+    public:
+        class iterator
+        {
+            public:
+                iterator(const HashTable *table)
+                    : m_table(table)
+                {
+                    m_pos = 0;
+                    m_cur = 0;
+                    if (m_table)
+                    {
+                        for (; m_pos < m_table->m_bucket_size; ++m_pos)
+                        {
+                            if (m_table->m_buckets[m_pos])
+                            {
+                                m_cur = m_table->m_buckets[m_pos];
+                                break;
+                            }
+                        }
+                    }
+                }
+                ~iterator()
+                {
+                    m_pos = 0;
+                    m_cur = 0;
+                }
+                iterator & operator ++()
+                {
+                    if (m_table)
+                    {
+                        if (0 == m_cur)
+                        {
+                            for (; m_pos < m_table->m_bucket_size; ++m_pos)
+                            {
+                                if (m_table->m_buckets[m_pos])
+                                {
+                                    m_cur = m_table->m_buckets[m_pos];
+                                    break;
+                                }
+                            }
+                        }
+                        if (0 != m_cur)
+                        {
+                            node_t *node = m_table->m_pool->addr(m_cur);
+                            m_cur = node->next;
+                        }
+                    }
+                    return *this;
+                }
+                iterator operator ++(int)
+                {
+                    iterator tmp(*this);
+                    this->operator ++();
+                    return tmp;
+                }
+                operator bool () const
+                {
+                    return 0 != m_cur;
+                }
+                const Key &key() const
+                {
+                    return m_table->m_pool->addr(m_cur)->key;
+                }
+                Value &value() const
+                {
+                    return m_table->m_pool->addr(m_cur)->value;
+                }
+            private:
+                const HashTable *const m_table;
+                size_t m_pos;
+                vaddr_t m_cur;
+        };
     private:
         HashTable(const HashTable &);
         HashTable &operator =(const HashTable &);
@@ -125,6 +197,17 @@ class HashTable
 
         size_t bucket_size() const { return m_bucket_size; }
         size_t size() const { return m_size; }
+        size_t mem_used() const
+        {
+            return sizeof(*this)
+                + sizeof(vaddr_t) * m_bucket_size
+                + m_size * sizeof(node_t);
+        }
+
+        iterator begin() const
+        {
+            return iterator(this);
+        }
 
         Value *find(const Key &key) const
         {

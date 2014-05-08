@@ -43,7 +43,7 @@ class ForwardIndex
     private:
         typedef TDelayPool<VMemoryPool> Pool;
         typedef Pool::vaddr_t vaddr_t;
-        typedef HashTable<long, vaddr_t> Hash;
+        typedef HashTable<int32_t, vaddr_t> Hash;
         typedef Hash::ObjectPool NodePool;
     private:
         ForwardIndex(const ForwardIndex &);
@@ -56,27 +56,24 @@ class ForwardIndex
 
         int get_offset_by_name(const char *name) const;
 
-        void *get_info_by_id(long id) const;
+        void *get_info_by_id(int32_t id) const;
 
-        bool update(long id, const std::string &key, const std::string &value)
+        bool update(int32_t id, const std::string &key, const std::string &value)
         {
             std::vector<std::pair<std::string, std::string> > kvs;
             kvs.push_back(std::make_pair(key, value));
             return this->update(id, kvs);
         }
-        bool update(long id, const std::vector<std::pair<std::string, std::string> > &kvs);
-        bool update(long id, const std::vector<std::pair<std::string, cJSON *> > &kvs);
+        bool update(int32_t id, const std::vector<std::pair<std::string, std::string> > &kvs);
+        bool update(int32_t id, const std::vector<std::pair<std::string, cJSON *> > &kvs);
 
-        void remove(long id);
+        void remove(int32_t id);
 
         void recycle()
         {
             m_pool.recycle();
         }
-        void print_meta() const
-        {
-            m_pool.print_meta();
-        }
+        void print_meta() const;
     private:
         struct cleanup_data_t
         {

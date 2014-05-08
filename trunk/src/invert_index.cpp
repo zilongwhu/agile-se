@@ -1184,3 +1184,105 @@ FAIL:
     }
     return NULL;
 }
+
+void InvertIndex::print_meta() const
+{
+    m_pool.print_meta();
+
+    WARNING("m_dict:");
+    WARNING("    size=%lu", (uint64_t)m_dict->size());
+    WARNING("    mem=%lu", (uint64_t)m_dict->mem_used());
+    {
+        size_t mem[256];
+        size_t count[256];
+        for (int i = 0; i < 256; ++i)
+        {
+            mem[i] = 0;
+            count[i] = 0;
+        }
+
+        bl_head_t *ph;
+        Hash::iterator it = m_dict->begin();
+        while (it)
+        {
+            ph = (bl_head_t *)it.value();
+            mem[ph->type] += sizeof(bl_head_t) + sizeof(int32_t) * ph->doc_num + ph->payload_len * ph->doc_num;
+            count[ph->type] += ph->doc_num;
+            ++it;
+        }
+
+        size_t total_mem = 0;
+        size_t total_count = 0;
+        for (int i = 0; i < 256; ++i)
+        {
+            if (count[i] > 0)
+            {
+                total_mem += mem[i];
+                total_count += count[i];
+                WARNING("    type[%d]: num=%lu, mem=%lu", i, (uint64_t)count[i], (uint64_t)mem[i]);
+            }
+        }
+        WARNING("    total_mem=%lu", (uint64_t)total_mem);
+        WARNING("    total_count=%lu", (uint64_t)total_count);
+    }
+
+    WARNING("m_add_dict:");
+    WARNING("    size=%lu", (uint64_t)m_add_dict->size());
+    WARNING("    mem=%lu", (uint64_t)m_add_dict->mem_used());
+    {
+        size_t total_mem = 0;
+        size_t total_count = 0;
+
+        SkipList *list;
+        VHash::iterator it = m_add_dict->begin();
+        while (it)
+        {
+            list = m_skiplist_pool.addr(it.value());
+            total_mem += list->mem_used();
+            total_count += list->size();
+            ++it;
+        }
+        WARNING("    total_mem=%lu", (uint64_t)total_mem);
+        WARNING("    total_count=%lu", (uint64_t)total_count);
+    }
+
+    WARNING("m_del_dict:");
+    WARNING("    size=%lu", (uint64_t)m_del_dict->size());
+    WARNING("    mem=%lu", (uint64_t)m_del_dict->mem_used());
+    {
+        size_t total_mem = 0;
+        size_t total_count = 0;
+
+        SkipList *list;
+        VHash::iterator it = m_del_dict->begin();
+        while (it)
+        {
+            list = m_skiplist_pool.addr(it.value());
+            total_mem += list->mem_used();
+            total_count += list->size();
+            ++it;
+        }
+        WARNING("    total_mem=%lu", (uint64_t)total_mem);
+        WARNING("    total_count=%lu", (uint64_t)total_count);
+    }
+
+    WARNING("m_docid2signs:");
+    WARNING("    size=%lu", (uint64_t)m_docid2signs->size());
+    WARNING("    mem=%lu", (uint64_t)m_docid2signs->mem_used());
+    {
+        size_t total_mem = 0;
+        size_t total_count = 0;
+
+        IDList *list;
+        VHash::iterator it = m_docid2signs->begin();
+        while (it)
+        {
+            list = m_idlist_pool.addr(it.value());
+            total_mem += list->mem_used();
+            total_count += list->size();
+            ++it;
+        }
+        WARNING("    total_mem=%lu", (uint64_t)total_mem);
+        WARNING("    total_count=%lu", (uint64_t)total_count);
+    }
+}

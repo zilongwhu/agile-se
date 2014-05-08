@@ -290,7 +290,7 @@ int ForwardIndex::get_offset_by_name(const char *name) const
     return it->second.offset;
 }
 
-void *ForwardIndex::get_info_by_id(long id) const
+void *ForwardIndex::get_info_by_id(int32_t id) const
 {
     vaddr_t *value = m_dict->find(id);
     if (value)
@@ -300,7 +300,7 @@ void *ForwardIndex::get_info_by_id(long id) const
     return NULL;
 }
 
-bool ForwardIndex::update(long id, const std::vector<std::pair<std::string, std::string> > &kvs)
+bool ForwardIndex::update(int32_t id, const std::vector<std::pair<std::string, std::string> > &kvs)
 {
     std::vector<std::pair<std::string, cJSON *> > tmp;
     for (size_t i = 0; i < kvs.size(); ++i)
@@ -328,7 +328,7 @@ CLEAN:
     return ret;
 }
 
-bool ForwardIndex::update(long id, const std::vector<std::pair<std::string, cJSON *> > &kvs)
+bool ForwardIndex::update(int32_t id, const std::vector<std::pair<std::string, cJSON *> > &kvs)
 {
     vaddr_t vnew = m_pool.alloc(m_info_size);
     void *mem = m_pool.addr(vnew);
@@ -409,7 +409,7 @@ bool ForwardIndex::update(long id, const std::vector<std::pair<std::string, cJSO
     return true;
 }
 
-void ForwardIndex::remove(long id)
+void ForwardIndex::remove(int32_t id)
 {
     vaddr_t *ptr;
     if (m_dict->remove(id, ptr))
@@ -418,4 +418,14 @@ void ForwardIndex::remove(long id)
         m_cleanup_data.addr = *ptr;
         m_delayed_list.push_back(m_cleanup_data);
     }
+}
+
+void ForwardIndex::print_meta() const
+{
+    m_pool.print_meta();
+
+    WARNING("m_dict:");
+    WARNING("    size=%lu", (uint64_t)m_dict->size());
+    WARNING("    mem=%lu", (uint64_t)m_dict->mem_used());
+    WARNING("    total_mem=%lu", (uint64_t)m_dict->size() * m_info_size);
 }

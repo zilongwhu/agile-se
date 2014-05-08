@@ -107,6 +107,10 @@ class SortList
         }
 
         uint32_t size() const { return m_size; }
+        size_t mem_used() const
+        {
+            return sizeof(*this) + m_size * sizeof(node_t);
+        }
 
         iterator begin() const
         {
