@@ -1,11 +1,11 @@
 // =====================================================================================
 //
-//       Filename:  builder.cpp
+//       Filename:  inc_utils.cpp
 //
 //    Description:  
 //
 //        Version:  1.0
-//        Created:  05/04/2014 02:30:26 PM
+//        Created:  05/08/2014 12:24:30 PM
 //       Revision:  none
 //       Compiler:  g++
 //
@@ -14,33 +14,9 @@
 //
 // =====================================================================================
 
-#include "reader.h"
-#include "forward_index.h"
-#include "invert_index.h"
-
-class TermParser: public InvertParser
-{
-    public:
-        TermParser() { memset(m_bytes, 0, sizeof m_bytes); }
-        void *parse(cJSON *json)
-        {
-            return m_bytes;
-        }
-    private:
-        char m_bytes[16];
-};
-
-class DummyParser: public InvertParser
-{
-    public:
-        void *parse(cJSON *json)
-        {
-            return NULL;
-        }
-};
-
-DEFINE_INVERT_PARSER(TermParser);
-DEFINE_INVERT_PARSER(DummyParser);
+#include "log.h"
+#include "inc_utils.h"
+#include "cJSON.h"
 
 int parse_forward_json(const std::string &json, std::vector<std::pair<std::string, std::string> > &kvs)
 {
@@ -111,13 +87,6 @@ FAIL:
     cJSON_Delete(cjson);
     return -1;
 }
-
-struct invert_data_t
-{
-    int8_t type;
-    std::string key;
-    std::string value;
-};
 
 int parse_invert_json(const std::string &json, std::vector<invert_data_t> &kvs)
 {
@@ -224,151 +193,5 @@ int parse_invert_json(const std::string &json, std::vector<invert_data_t> &kvs)
     return 0;
 FAIL:
     cJSON_Delete(cjson);
-    return -1;
-}
-
-int build_index()
-{
-    enum
-    {
-        FORWARD_LEVEL = 2,
-        INVERT_LEVEL = 3,
-    };
-    enum { OP_INSERT = 0, OP_DELETE = 1, OP_UPDATE = 2 };
-
-    init_time_updater();
-
-    REGISTER_INVERT_PARSER(TermParser);
-    REGISTER_INVERT_PARSER(DummyParser);
-
-    ForwardIndex idx;
-    idx.init("./conf", "fields.conf");
-
-    InvertIndex invert;
-    invert.init("./conf", "invert.conf");
-
-    IncReader reader;
-    reader.init("./conf", "inc.meta");
-
-    const size_t log_buffer_length = 4096;
-    char *log_buffer = new char[log_buffer_length];
-
-    char *line = reader._line_buf;
-    uint32_t now = g_now_time;
-    uint32_t delete_count = 0;
-    uint32_t update_invert_count = 0;
-    uint32_t update_forward_count = 0;
-    uint32_t last_print_time = now;
-
-    std::vector<invert_data_t> items;
-    std::vector<std::pair<std::string, std::string> > kvs;
-    while (1)
-    {
-        if (now != g_now_time)
-        {
-            P_MYLOG("processe stats: sku_num[%d], update[forward=%u, invert=%u], delete[%u], in[%u ~ %u]",
-                    int(invert.docs_num()), update_forward_count, update_invert_count, delete_count, now, g_now_time);
-
-            idx.recycle();
-            invert.recycle();
-
-            if (last_print_time + 5 < g_now_time)
-            {
-                idx.print_meta();
-                invert.print_meta();
-                last_print_time = g_now_time;
-            }
-
-            delete_count = 0;
-            update_invert_count = 0;
-            update_forward_count = 0;
-            now = g_now_time;
-        }
-        int ret = reader.next();
-        if (0 == ret)
-        {
-            ::usleep(10);
-        }
-        else if (1 == ret)
-        {
-            std::vector<std::string> fields;
-            split(line, "\t", fields);
-            if (fields.size() < 4)
-            {
-                P_MYLOG("must has [eventid, optype, level, oid]");
-                continue;
-            }
-            int32_t optype = ::strtol(fields[1].c_str(), NULL, 10);
-            int32_t level = ::strtol(fields[2].c_str(), NULL, 10);
-            int32_t oid = ::strtoul(fields[3].c_str(), NULL, 10);
-            if (oid % reader.total_partition() != reader.current_partition())
-            {
-                continue;
-            }
-            switch (level)
-            {
-                case FORWARD_LEVEL:
-                    if (OP_UPDATE == optype)
-                    {
-                        if (parse_forward_json(fields[4], kvs) < 0)
-                        {
-                            P_MYLOG("failed to parse forward json");
-                        }
-                        else if (!idx.update(oid, kvs))
-                        {
-                            P_MYLOG("failed to update forward index");
-                        }
-                        else
-                        {
-                            TRACE("update forward ok, oid=%d", oid);
-                            ++update_forward_count;
-                        }
-                    }
-                    break;
-                case INVERT_LEVEL:
-                    if (OP_DELETE == optype)
-                    {
-                        idx.remove(oid);
-                        invert.remove(oid);
-                        TRACE("delete ok, oid=%d", oid);
-                        ++delete_count;
-                    }
-                    else if (OP_UPDATE == optype)
-                    {
-                        if (parse_forward_json(fields[4], kvs) < 0)
-                        {
-                            P_MYLOG("failed to parse forward json");
-                        }
-                        else if (parse_invert_json(fields[5], items) < 0)
-                        {
-                            P_MYLOG("failed to parse invert json");
-                        }
-                        else
-                        {
-                            if (!idx.update(oid, kvs))
-                            {
-                                P_MYLOG("failed to update forward index");
-                            }
-                            else
-                            {
-                                invert.remove(oid);
-                                for (size_t i = 0; i < items.size(); ++i)
-                                {
-                                    invert.insert(items[i].key.c_str(), items[i].type, oid, items[i].value);
-                                }
-                                TRACE("update ok, oid=%d", oid);
-                                ++update_invert_count;
-                            }
-                        }
-                    }
-                    break;
-            };
-        }
-        else if (ret < 0)
-        {
-            FATAL("disk file error");
-            break;
-        }
-    }
     return -1;
 }
