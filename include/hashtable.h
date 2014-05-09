@@ -96,21 +96,22 @@ class HashTable
                 {
                     if (m_table)
                     {
-                        if (0 == m_cur)
-                        {
-                            for (; m_pos < m_table->m_bucket_size; ++m_pos)
-                            {
-                                if (m_table->m_buckets[m_pos])
-                                {
-                                    m_cur = m_table->m_buckets[m_pos];
-                                    break;
-                                }
-                            }
-                        }
                         if (0 != m_cur)
                         {
                             node_t *node = m_table->m_pool->addr(m_cur);
                             m_cur = node->next;
+                            if (0 == m_cur)
+                            {
+                                ++m_pos;
+                                for (; m_pos < m_table->m_bucket_size; ++m_pos)
+                                {
+                                    if (m_table->m_buckets[m_pos])
+                                    {
+                                        m_cur = m_table->m_buckets[m_pos];
+                                        break;
+                                    }
+                                }
+                            }
                         }
                     }
                     return *this;

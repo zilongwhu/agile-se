@@ -32,6 +32,7 @@ int inc_build_index(inc_builder_t *args)
     uint32_t update_invert_count = 0;
     uint32_t update_forward_count = 0;
     uint32_t last_print_time = now;
+    uint32_t last_merge_time = now;
 
     std::vector<invert_data_t> items;
     std::vector<std::pair<std::string, std::string> > kvs;
@@ -45,11 +46,16 @@ int inc_build_index(inc_builder_t *args)
             forward.recycle();
             invert.recycle();
 
-            if (last_print_time + 5 < g_now_time)
+            if (last_print_time + 3600 < g_now_time)
             {
                 forward.print_meta();
                 invert.print_meta();
                 last_print_time = g_now_time;
+            }
+            if (last_merge_time + 3600 < g_now_time)
+            {
+                invert.print_list_length();
+                last_merge_time = g_now_time;
             }
 
             delete_count = 0;
