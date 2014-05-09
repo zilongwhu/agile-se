@@ -154,12 +154,10 @@ class AddList: public DocList
     public:
         typedef InvertIndex::SkipList::iterator Iterator;
 
-        AddList(uint32_t sign, uint8_t type, uint16_t payload_len, Iterator it)
+        AddList(uint32_t sign, Iterator it)
             : m_it(it), m_it_c(it), m_end(0, it.list())
         {
             m_sign = sign;
-            m_type = type;
-            m_payload_len = payload_len;
         }
 
         int32_t first()
@@ -191,11 +189,11 @@ class AddList: public DocList
             {
                 m_strategy_data.data = m_data;
                 m_strategy_data.sign = m_sign;
-                m_strategy_data.type = m_type;
-                m_strategy_data.length = m_payload_len;
-                if (m_payload_len > 0)
+                m_strategy_data.type = m_it.type();
+                m_strategy_data.length = m_it.payload_len();
+                if (m_it.payload_len() > 0)
                 {
-                    ::memcpy(m_strategy_data.result, m_it.payload(), m_payload_len);
+                    ::memcpy(m_strategy_data.result, m_it.payload(), m_it.payload_len());
                 }
                 st.work(&m_strategy_data);
                 return &m_strategy_data;
@@ -204,8 +202,6 @@ class AddList: public DocList
         }
     private:
         uint32_t m_sign;
-        uint8_t m_type;
-        uint16_t m_payload_len;
         Iterator m_it;
         Iterator m_it_c;
         Iterator m_end;
@@ -574,10 +570,10 @@ DocList *InvertIndex::trigger(const char *keystr, uint8_t type) const
         return NULL;
     }
     uint32_t sign = m_types.get_sign(keystr, type);
-    return this->trigger(sign, type);
+    return this->trigger(sign);
 }
 
-DocList *InvertIndex::trigger(uint32_t sign, uint8_t type) const
+DocList *InvertIndex::trigger(uint32_t sign) const
 {
     void **big = m_dict->find(sign);
     vaddr_t *vadd = m_add_dict->find(sign);
@@ -608,8 +604,7 @@ DocList *InvertIndex::trigger(uint32_t sign, uint8_t type) const
     AddList *al = NULL;
     if (add)
     {
-        al = new(std::nothrow) AddList(sign, type,
-                m_types.types[type].payload_len, add->begin());
+        al = new(std::nothrow) AddList(sign, add->begin());
         if (NULL == al)
         {
             WARNING("failed to new AddList");
@@ -727,7 +722,7 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, cJSON 
 bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, void *payload)
 {
     uint32_t sign = m_types.record_sign(keystr, type);
-    const uint32_t payload_len = m_types.types[type].payload_len;
+    uint16_t payload_len = m_types.types[type].payload_len;
     SkipList *add_list = NULL;
     vaddr_t *vadd_list = m_add_dict->find(sign);
     if (vadd_list)
@@ -748,12 +743,12 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, void *
         }
         if (add_list->size() > (uint32_t)m_merge_threshold)
         {
-            this->merge(sign, type);
+            this->merge(sign);
         }
     }
     else
     {
-        vaddr_t vlist = m_skiplist_pool.alloc(&m_pool, payload_len);
+        vaddr_t vlist = m_skiplist_pool.alloc(&m_pool, type, payload_len);
         SkipList *tmp = m_skiplist_pool.addr(vlist);
         if (NULL == tmp)
         {
@@ -828,12 +823,12 @@ bool InvertIndex::remove(const char *keystr, uint8_t type, int32_t docid)
         }
         if (del_list->size() > (uint32_t)m_merge_threshold)
         {
-            this->merge(sign, type);
+            this->merge(sign);
         }
     }
     else
     {
-        vaddr_t vlist = m_skiplist_pool.alloc(&m_pool, 0);
+        vaddr_t vlist = m_skiplist_pool.alloc(&m_pool, 0xFF, 0);
         SkipList *tmp = m_skiplist_pool.addr(vlist);
         if (NULL == tmp)
         {
@@ -899,7 +894,7 @@ bool InvertIndex::remove(int32_t docid)
         }
         else
         {
-            vaddr_t vlist = m_skiplist_pool.alloc(&m_pool, 0);
+            vaddr_t vlist = m_skiplist_pool.alloc(&m_pool, 0xFF, 0);
             SkipList *tmp = m_skiplist_pool.addr(vlist);
             if (NULL == tmp)
             {
@@ -929,22 +924,31 @@ bool InvertIndex::remove(int32_t docid)
     return true;
 }
 
-void InvertIndex::merge(uint32_t sign, uint8_t type)
+uint32_t InvertIndex::merge(uint32_t sign)
 {
     long us = 0;
+    uint32_t docnum = 0;
     FastTimer timer;
 
     timer.start();
     std::string word;
     m_sign2id.find(sign, word);
-    const uint32_t payload_len = m_types.types[type].payload_len;
-    DocList *list = this->trigger(sign, type);
+    DocList *list = this->trigger(sign);
     if (list)
     {
-        int docnum = 0;
+        DummyStrategy st;
+
+        uint8_t type = 0xFF;
+        uint16_t payload_len = 0;
         int32_t docid = list->first();
         while (docid != -1)
         {
+            if (0 == docnum)
+            {
+                InvertStrategy::info_t *info = list->get_strategy_data(st);
+                type = info->type;
+                payload_len = info->length;
+            }
             ++docnum;
             docid = list->next();
         }
@@ -953,8 +957,6 @@ void InvertIndex::merge(uint32_t sign, uint8_t type)
             void *mem = ::malloc(sizeof(bl_head_t) + sizeof(int32_t)*docnum + payload_len*docnum);
             if (mem)
             {
-                DummyStrategy st;
-
                 bl_head_t *head = (bl_head_t *)mem;
                 head->type = type;
                 head->payload_len = payload_len;
@@ -981,7 +983,8 @@ void InvertIndex::merge(uint32_t sign, uint8_t type)
 
                     timer.stop();
                     us = timer.timeInUs();
-                    WARNING("merge sign[%u] ok, type[%d], word[%s], list len=%d, cost %ld us", sign, int(type), word.c_str(), docnum, us);
+                    WARNING("merge sign[%u] ok, type[%d], word[%s], list len=%u, cost %ld us",
+                            sign, int(type), word.c_str(), docnum, us);
                 }
                 else
                 {
@@ -991,8 +994,7 @@ void InvertIndex::merge(uint32_t sign, uint8_t type)
             }
             else
             {
-                WARNING("failed to alloc mem[%d]", (sizeof(bl_head_t)
-                            + sizeof(int32_t)*docnum + payload_len*docnum));
+                WARNING("failed to alloc mem[%d]", (sizeof(bl_head_t) + sizeof(int32_t)*docnum + payload_len*docnum));
             }
         }
         else
@@ -1003,10 +1005,11 @@ void InvertIndex::merge(uint32_t sign, uint8_t type)
 
             timer.stop();
             us = timer.timeInUs();
-            WARNING("merge sign[%u] ok, type[%d], word[%s], list len=%d, cost %ld us", sign, int(type), word.c_str(), docnum, us);
+            WARNING("merge sign[%u] ok, word[%s], list len=%d, cost %ld us", sign, word.c_str(), docnum, us);
         }
         delete list;
     }
+    return docnum;
 }
 
 void InvertIndex::cleanup_node(Hash::node_t *node, intptr_t arg)
@@ -1285,4 +1288,100 @@ void InvertIndex::print_meta() const
         WARNING("    total_mem=%lu", (uint64_t)total_mem);
         WARNING("    total_count=%lu", (uint64_t)total_count);
     }
+}
+
+struct sign_num_t
+{
+    uint32_t sign;
+    int32_t docnum;
+
+    sign_num_t(uint32_t s, int32_t n): sign(s), docnum(n) { }
+
+    bool operator < (const sign_num_t &o) const
+    {
+        if (docnum == o.docnum)
+        {
+            return sign < o.sign;
+        }
+        else if (docnum > o.docnum)
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+};
+
+void InvertIndex::print_list_length()
+{
+    this->mergeAll();
+
+    std::vector<sign_num_t> signs;
+    Hash::iterator it = m_dict->begin();
+    while (it)
+    {
+        signs.push_back(sign_num_t(it.key(), ((bl_head_t *)it.value())->doc_num));
+        ++it;
+    }
+    std::sort(signs.begin(), signs.end());
+    std::string word;
+    for (size_t i = 0; i < signs.size(); ++i)
+    {
+        m_sign2id.find(signs[i].sign, word);
+        WARNING("word[%s], length=%d", word.c_str(), signs[i].docnum);
+    }
+}
+
+void InvertIndex::mergeAll()
+{
+    WARNING("start to merge all signs");
+
+    FastTimer timer;
+
+    timer.start();
+    std::vector<uint32_t> signs;
+    {
+        signs.reserve(m_add_dict->size());
+        VHash::iterator it = m_add_dict->begin();
+        while (it)
+        {
+            signs.push_back(it.key());
+            ++it;
+        }
+    }
+    timer.stop();
+    WARNING("add signs size=%u, time=%ld ms", (uint32_t)signs.size(), timer.timeInMs());
+
+    timer.start();
+    size_t len = 0;
+    for (size_t i = 0; i < signs.size(); ++i)
+    {
+        len += this->merge(signs[i]);
+    }
+    timer.stop();
+    WARNING("merge add signs ok, all length=%lu, time=%ld ms", (uint64_t)len, timer.timeInMs());
+
+    timer.start();
+    signs.clear();
+    {
+        signs.reserve(m_del_dict->size());
+        VHash::iterator it = m_del_dict->begin();
+        while (it)
+        {
+            signs.push_back(it.key());
+            ++it;
+        }
+    }
+    timer.stop();
+    WARNING("del signs size=%u, time=%ld ms", (uint32_t)signs.size(), timer.timeInMs());
+
+    timer.start();
+    for (size_t i = 0; i < signs.size(); ++i)
+    {
+        len += this->merge(signs[i]);
+    }
+    timer.stop();
+    WARNING("merge del signs ok, all length=%lu, time=%ld ms", (uint64_t)len, timer.timeInMs());
 }

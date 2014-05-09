@@ -90,10 +90,12 @@ class InvertIndex
             return this->m_docid2signs->size();
         }
         void print_meta() const;
+        void print_list_length();
     private:
-        DocList *trigger(uint32_t sign, uint8_t type) const;
+        DocList *trigger(uint32_t sign) const;
         bool insert(const char *keystr, uint8_t type, int32_t docid, void *payload);
-        void merge(uint32_t sign, uint8_t type);
+        uint32_t merge(uint32_t sign);
+        void mergeAll();
     private:
         static void cleanup_node(Hash::node_t *node, intptr_t arg);
         static void cleanup_diff_node(VHash::node_t *node, intptr_t arg);

@@ -23,7 +23,7 @@
 #include "mempool2.h"
 #include "delaypool.h"
 
-template<typename TMemoryPool = VMemoryPool, uint32_t M = 20>
+template<typename TMemoryPool = VMemoryPool, uint8_t M = 20>
 class TSkipList
 {
     private:
@@ -65,6 +65,8 @@ class TSkipList
                 {
                     return ((node_t *)m_pool->addr(m_cur))->id;
                 }
+                uint32_t type() const { return m_list->type(); }
+                uint32_t payload_len() const { return m_list->payload_len(); }
                 void *payload()
                 {
                     node_t *node = (node_t *)m_pool->addr(m_cur);
@@ -92,7 +94,7 @@ class TSkipList
                 const DelayPool *m_pool;
         };
     public:
-        static int init_pool(DelayPool *pool, uint32_t payload_len)
+        static int init_pool(DelayPool *pool, uint16_t payload_len)
         {
             for (uint32_t i = 0; i < M; ++i)
             {
@@ -100,24 +102,24 @@ class TSkipList
                     + (payload_len + sizeof(vaddr_t) - 1) / sizeof(vaddr_t) * sizeof(vaddr_t);
                 if (pool->register_item(size) < 0)
                 {
-                    WARNING("failed to register node, level=%d, size=%u, payload_len=%u", i, size, payload_len);
+                    WARNING("failed to register node, level=%u, size=%u, payload_len=%hu", i, size, payload_len);
                     return -1;
                 }
-                WARNING("register node ok, level=%d, size=%u, payload_len=%u", i, size, payload_len);
+                WARNING("register node ok, level=%u, size=%u, payload_len=%hu", i, size, payload_len);
             }
-            WARNING("init pool ok, payload_len=%u", payload_len);
+            WARNING("init pool ok, payload_len=%hu", payload_len);
             return 0;
         }
     private:
         TSkipList(const TSkipList &);
         TSkipList &operator =(const TSkipList &);
     public:
-        TSkipList(DelayPool *pool, uint32_t payload_len)
-            : m_pool(pool), m_payload_len(payload_len)
+        TSkipList(DelayPool *pool, uint8_t type, uint16_t payload_len)
+            : m_pool(pool), m_type(type), m_payload_len(payload_len)
         {
             m_size = 0;
             m_cur_level = 0;
-            for (uint32_t i = 0; i < M; ++i)
+            for (uint8_t i = 0; i < M; ++i)
             {
                 m_head[i] = 0;
             }
@@ -137,6 +139,7 @@ class TSkipList
             m_size = 0;
         }
 
+        uint32_t type() const { return m_type; }
         uint32_t payload_len() const { return m_payload_len; }
         uint32_t cur_level() const { return m_cur_level; }
         uint32_t size() const { return m_size; }
@@ -535,10 +538,10 @@ class TSkipList
         }
     private:
         DelayPool *const m_pool;
-        const uint32_t m_payload_len;
-
         uint32_t m_size;
-        uint32_t m_cur_level;
+        uint8_t m_cur_level;
+        const uint8_t m_type;
+        const uint16_t m_payload_len;
         vaddr_t m_head[M];
 };
 
