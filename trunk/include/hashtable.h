@@ -237,10 +237,16 @@ class HashTable
             {
                 return false;
             }
+            vaddr_t vnew = m_pool->template alloc<const Key &, const Value &>(key, v);
+            if (0 == vnew)
+            {
+                return false;
+            }
             size_t off = m_hash(key) % m_bucket_size;
 
             node_t *node;
             node_t *pre = NULL;
+            bool overwrite = false;
             vaddr_t cur = m_buckets[off];
             while (0 != cur)
             {
@@ -255,30 +261,31 @@ class HashTable
                     {
                         m_buckets[off] = node->next;
                     }
-                    m_pool->delay_free(cur, m_cleanup_fun, m_cleanup_arg);
-                    --m_size;
+                    overwrite = true;
                     break;
                 }
                 pre = node;
                 cur = node->next;
             }
-            cur = m_pool->template alloc<const Key &, const Value &>(key, v);
-            node = m_pool->addr(cur);
-            if (NULL == node)
-            {
-                return false;
-            }
+            node = m_pool->addr(vnew);
             if (pre)
             {
                 node->next = pre->next;
-                pre->next = cur;
+                pre->next = vnew;
             }
             else
             {
                 node->next = m_buckets[off];
-                m_buckets[off] = cur;
+                m_buckets[off] = vnew;
             }
-            ++m_size;
+            if (overwrite)
+            {
+                m_pool->delay_free(cur, m_cleanup_fun, m_cleanup_arg);
+            }
+            else
+            {
+                ++m_size;
+            }
             return true;
         }
 

@@ -196,7 +196,7 @@ class TSkipList
                 return vcur;
             }
             node_t *next;
-            vaddr_t vnext;
+            vaddr_t vnext = 0;
             int32_t cur_level;
             while (1)
             {
