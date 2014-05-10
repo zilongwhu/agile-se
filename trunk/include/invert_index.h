@@ -62,7 +62,8 @@ class InvertIndex
     public:
         InvertIndex()
         {
-            m_merge_threshold = 32;
+            m_merge_threshold = 10000;
+            m_merge_all_threshold = 1000;
             m_dict = NULL;
             m_add_dict = NULL;
             m_del_dict = NULL;
@@ -95,7 +96,7 @@ class InvertIndex
         DocList *trigger(uint32_t sign) const;
         bool insert(const char *keystr, uint8_t type, int32_t docid, void *payload);
         uint32_t merge(uint32_t sign);
-        void mergeAll();
+        void mergeAll(uint32_t length);
     private:
         static void cleanup_node(Hash::node_t *node, intptr_t arg);
         static void cleanup_diff_node(VHash::node_t *node, intptr_t arg);
@@ -103,6 +104,7 @@ class InvertIndex
     private:
         InvertTypes m_types;
         int32_t m_merge_threshold;
+        int32_t m_merge_all_threshold;
 
         Pool m_pool;
         NodePool m_node_pool;
