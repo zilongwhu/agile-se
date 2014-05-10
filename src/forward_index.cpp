@@ -411,11 +411,11 @@ bool ForwardIndex::update(int32_t id, const std::vector<std::pair<std::string, c
 
 void ForwardIndex::remove(int32_t id)
 {
-    vaddr_t *ptr;
-    if (m_dict->remove(id, ptr))
+    vaddr_t addr;
+    if (m_dict->remove(id, &addr))
     {
-        m_cleanup_data.mem = m_pool.addr(*ptr);
-        m_cleanup_data.addr = *ptr;
+        m_cleanup_data.mem = m_pool.addr(addr);
+        m_cleanup_data.addr = addr;
         m_delayed_list.push_back(m_cleanup_data);
     }
 }
