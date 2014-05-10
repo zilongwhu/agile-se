@@ -582,10 +582,13 @@ DocList *InvertIndex::trigger(uint32_t sign) const
     {
         return NULL;
     }
-    SkipList *add = m_skiplist_pool.addr(*vadd);
-    SkipList *del = NULL;
-
+    SkipList *add = NULL;
+    if (NULL != vadd)
+    {
+        add = m_skiplist_pool.addr(*vadd);
+    }
     vaddr_t *vdel = m_del_dict->find(sign);
+    SkipList *del = NULL;
     if (NULL != vdel)
     {
         del = m_skiplist_pool.addr(*vdel);
