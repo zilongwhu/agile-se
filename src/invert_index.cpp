@@ -429,6 +429,11 @@ int InvertIndex::init(const char *path, const char *file)
         WARNING("failed to get merge_threshold");
         return -1;
     }
+    if (!config.get("merge_all_threshold", m_merge_all_threshold) || m_merge_all_threshold <= 0)
+    {
+        WARNING("failed to get merge_all_threshold");
+        return -1;
+    }
     if (m_pool.register_item(sizeof(NodePool::ObjectType)) < 0)
     {
         WARNING("failed to register node to mempool");
@@ -552,6 +557,8 @@ int InvertIndex::init(const char *path, const char *file)
 
     m_types.set_sign_dict(&m_sign2id);
 
+    WARNING("merge_threshold=%u", m_merge_threshold);
+    WARNING("merge_all_threshold=%u", m_merge_all_threshold);
     WARNING("signdict_hash_size=%u", signdict_hash_size);
     WARNING("signdict_buffer_size=%u", signdict_buffer_size);
     WARNING("dict_hash_size=%u", dict_hash_size);
@@ -1319,15 +1326,32 @@ struct sign_num_t
 
 void InvertIndex::print_list_length()
 {
-    this->mergeAll();
+    this->mergeAll(m_merge_all_threshold);
 
+    size_t total_len = 0;
     std::vector<sign_num_t> signs;
-    Hash::iterator it = m_dict->begin();
-    while (it)
+    for (uint32_t i = 1; i <= m_sign2id.idnum(); ++i)
     {
-        signs.push_back(sign_num_t(it.key(), ((bl_head_t *)it.value())->doc_num));
-        ++it;
+        DocList *doc = this->trigger(i);
+        if (doc)
+        {
+            int32_t doc_num = 0;
+            int32_t docid = doc->first();
+            while (docid != -1)
+            {
+                docid = doc->next();
+                ++doc_num;
+            }
+            if (doc_num > 0)
+            {
+                signs.push_back(sign_num_t(i, doc_num));
+            }
+            total_len += doc_num;
+            delete doc;
+        }
     }
+    WARNING("total word count=%lu, total invert length=%lu", (uint64_t)signs.size(), (uint64_t)total_len);
+
     std::sort(signs.begin(), signs.end());
     std::string word;
     for (size_t i = 0; i < signs.size(); ++i)
@@ -1337,9 +1361,9 @@ void InvertIndex::print_list_length()
     }
 }
 
-void InvertIndex::mergeAll()
+void InvertIndex::mergeAll(uint32_t length)
 {
-    WARNING("start to merge all signs");
+    WARNING("start to merge all signs whose length > %u", length);
 
     FastTimer timer;
 
@@ -1350,12 +1374,16 @@ void InvertIndex::mergeAll()
         VHash::iterator it = m_add_dict->begin();
         while (it)
         {
-            signs.push_back(it.key());
+            if (m_skiplist_pool.addr(it.value())->size() > length)
+            {
+                signs.push_back(it.key());
+            }
             ++it;
         }
     }
     timer.stop();
-    WARNING("add signs size=%u, time=%ld ms", (uint32_t)signs.size(), timer.timeInMs());
+    WARNING("add signs whose length > %u, size=%u, time=%ld ms",
+            length, (uint32_t)signs.size(), timer.timeInMs());
 
     timer.start();
     size_t len = 0;
@@ -1373,18 +1401,23 @@ void InvertIndex::mergeAll()
         VHash::iterator it = m_del_dict->begin();
         while (it)
         {
-            signs.push_back(it.key());
+            if (m_skiplist_pool.addr(it.value())->size() > length)
+            {
+                signs.push_back(it.key());
+            }
             ++it;
         }
     }
     timer.stop();
-    WARNING("del signs size=%u, time=%ld ms", (uint32_t)signs.size(), timer.timeInMs());
+    WARNING("del signs whose length > %u, size=%u, time=%ld ms",
+            length, (uint32_t)signs.size(), timer.timeInMs());
 
     timer.start();
+    size_t len2 = 0;
     for (size_t i = 0; i < signs.size(); ++i)
     {
-        len += this->merge(signs[i]);
+        len2 += this->merge(signs[i]);
     }
     timer.stop();
-    WARNING("merge del signs ok, all length=%lu, time=%ld ms", (uint64_t)len, timer.timeInMs());
+    WARNING("merge del signs ok, all length=%lu, time=%ld ms", (uint64_t)len2, timer.timeInMs());
 }
