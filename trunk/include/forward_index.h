@@ -75,6 +75,9 @@ class ForwardIndex
             m_pool.recycle();
         }
         void print_meta() const;
+
+        bool load(const char *dir);
+        bool dump(const char *dir) const;
     private:
         struct cleanup_data_t
         {

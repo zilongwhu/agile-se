@@ -443,3 +443,143 @@ void ForwardIndex::print_meta() const
     WARNING("    mem=%lu", (uint64_t)m_dict->mem_used());
     WARNING("    total_mem=%lu", (uint64_t)m_dict->size() * m_info_size);
 }
+
+bool ForwardIndex::dump(const char *dir) const
+{
+    if (NULL == dir || '\0' == *dir)
+    {
+        WARNING("empty dir error");
+        return false;
+    }
+    WARNING("start to write dir[%s]", dir);
+    std::string path(dir);
+    if ('/' != path[path.length() - 1])
+    {
+        path += "/";
+    }
+    FILE *idx = ::fopen((path + "forward.idx").c_str(), "wb");
+    if (NULL == idx)
+    {
+        WARNING("failed to open file[%sforward.idx] for write", path.c_str());
+        return false;
+    }
+    FILE *data = ::fopen((path + "forward.data").c_str(), "wb");
+    if (NULL == data)
+    {
+        ::fclose(idx);
+
+        WARNING("failed to open file[%sforward.data] for write", path.c_str());
+        return false;
+    }
+    bool ret = true;
+    size_t offset = 0;
+    size_t size = m_dict->size();
+    uint32_t length = 0;
+    Message *message = NULL;
+    Hash::iterator it = m_dict->begin();
+    const std::vector<int> &self_defines = m_cleanup_data.fields_need_free;
+
+    size_t buffer_size = 1024*1024;
+    char *buffer = new char[buffer_size];
+    if (NULL == buffer)
+    {
+        WARNING("failed to init buffer");
+        goto FAIL;
+    }
+
+    if (::fwrite(&size, sizeof(size), 1, idx) != 1)
+    {
+        WARNING("failed to write size");
+        goto FAIL;
+    }
+    if (::fwrite(&m_info_size, sizeof(m_info_size), 1, idx) != 1)
+    {
+        WARNING("failed to write m_info_size");
+        goto FAIL;
+    }
+    while (it)
+    {
+        int32_t key = it.key();
+        void *mem = m_pool.addr(it.value());
+        length = m_info_size;
+        for (size_t i = 0; i < self_defines.size(); ++i)
+        {
+            message = ((Message **)mem)[self_defines[i]];
+            if (message)
+            {
+                length += message->ByteSize();
+            }
+        }
+        if (length > buffer_size)
+        {
+            char *new_buffer = new char[length];
+            if (NULL == new_buffer)
+            {
+                WARNING("failed to new buffer, length=%u", length);
+                goto FAIL;
+            }
+            delete [] buffer;
+            buffer = new_buffer;
+            buffer_size = length;
+        }
+        ::memcpy(buffer, mem, m_info_size);
+        length = m_info_size;
+        for (size_t i = 0; i < self_defines.size(); ++i)
+        {
+            message = ((Message **)mem)[self_defines[i]];
+            if (message)
+            {
+                if (!message->SerializeToArray(buffer + length, buffer_size - length))
+                {
+                    WARNING("failed to serialize self define field to bytes");
+                    goto FAIL;
+                }
+                uint32_t len = message->ByteSize();
+                if (sizeof(void *) == sizeof(uint32_t))
+                {
+                    uint16_t *arr = (uint16_t *)message;
+                    arr[0] = length;
+                    arr[1] = len;
+                }
+                else
+                {
+                    uint32_t *arr = (uint32_t *)message;
+                    arr[0] = length;
+                    arr[1] = len;
+                }
+                length += len;
+            }
+        }
+        if (::fwrite(buffer, length, 1, data) != 1)
+        {
+            WARNING("failed to write to data file");
+            goto FAIL;
+        }
+        if (::fwrite(&key, sizeof(key), 1, idx) != 1)
+        {
+            WARNING("failed to write key to idx file");
+            goto FAIL;
+        }
+        if (::fwrite(&offset, sizeof(offset), 1, idx) != 1)
+        {
+            WARNING("failed to write offset to idx file");
+            goto FAIL;
+        }
+        if (::fwrite(&length, sizeof(length), 1, idx) != 1)
+        {
+            WARNING("failed to write length to idx file");
+            goto FAIL;
+        }
+        offset += length;
+        ++it;
+    }
+    WARNING("write to dir[%s] ok", dir);
+    if (0)
+    {
+FAIL:
+        ret = false;
+    }
+    ::fclose(data);
+    ::fclose(idx);
+    return ret;
+}
