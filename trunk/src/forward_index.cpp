@@ -581,5 +581,9 @@ FAIL:
     }
     ::fclose(data);
     ::fclose(idx);
+    if (buffer)
+    {
+        delete [] buffer;
+    }
     return ret;
 }
