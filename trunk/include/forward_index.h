@@ -26,7 +26,8 @@
 #include "delaypool.h"
 #include "objectpool.h"
 #include "hashtable.h"
-#include "field_parser.h"
+#include "cJSON.h"
+#include <google/protobuf/message.h>
 
 class ForwardIndex
 {
@@ -37,8 +38,8 @@ class ForwardIndex
         {
             int offset;
             int array_offset;
-            int type; /* 0->int, 1->float, 2->void * */
-            FieldParser *parser;
+            int type; /* 0->int, 1->float, 2->google::protobuf::Message * */
+            const google::protobuf::Message *default_message;
         };
     private:
         typedef TDelayPool<VMemoryPool> Pool;
@@ -79,7 +80,7 @@ class ForwardIndex
         {
             void *mem;
             Pool::vaddr_t addr;
-            std::vector<std::pair<int, FieldParser *> > fields_need_free;
+            std::vector<int> fields_need_free;
 
             void clean()
             {
@@ -89,11 +90,11 @@ class ForwardIndex
                 }
                 for (size_t i = 0; i < fields_need_free.size(); ++i)
                 {
-                    std::pair<int, FieldParser *> &tmp = fields_need_free[i];
-                    void *ptr = ((void **)mem)[tmp.first];
-                    if (ptr)
+                    google::protobuf::Message *message =
+                        (google::protobuf::Message *)((void **)mem)[fields_need_free[i]];
+                    if (message)
                     {
-                        tmp.second->destroy(ptr);
+                        delete message;
                     }
                 }
             }
