@@ -384,7 +384,7 @@ bool ForwardIndex::update(int32_t id, const std::vector<std::pair<std::string, c
             cd.fields_need_free.push_back(array_offset);
             if (cJSON_String == kv.second->type)
             {
-                if (!ptr->ParseFromString(kv.second->valuestring))
+                if (!json2pb(*ptr, kv.second->valuestring))
                 {
                     WARNING("failed to parse from json, field_name[%s]", kv.first.c_str());
                     goto FAIL;
