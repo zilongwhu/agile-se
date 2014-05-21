@@ -14,8 +14,8 @@
 //
 // =====================================================================================
 
-#ifndef __NBSLIB_JSON2PB_H__
-#define __NBSLIB_JSON2PB_H__
+#ifndef __AGILE_SE_JSON2PB_H__
+#define __AGILE_SE_JSON2PB_H__
 
 #include <google/protobuf/message.h>
 #include "cJSON.h"
