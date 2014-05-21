@@ -31,6 +31,7 @@
 #include "inc_builder.h"
 #include "json2pb.h"
 #include "test.pb.h"
+#include <google/protobuf/descriptor.h>
 
 int nums[10000];
 
@@ -329,10 +330,18 @@ int main(int argc, char *argv[])
 //
 //    WARNING("size=%u, cur_level=%u", sl.size(), sl.cur_level());
 
-    test pt;
-    json2pb(pt, "{\"i32\": 32, \"ivec\": [12, 24, \"abc\"]}");
-    WARNING("i32=%d", pt.i32());
-    return 0;
+//    using namespace google::protobuf;
+//    const DescriptorPool *pl = DescriptorPool::generated_pool();
+//    const Descriptor *des = pl->FindMessageTypeByName("test");
+//    MessageFactory *mf = MessageFactory::generated_factory();
+//    const Message *dm = mf->GetPrototype(des);
+//
+//    WARNING("%s", des->DebugString().c_str());
+//
+//    Message *ms = dm->New();
+//    json2pb(*ms, "{\"i32\": 32, \"ivec\": [12, 24, \"abc\"]}");
+//    WARNING("i32=%d", ((test *)ms)->i32());
+//    return 0;
 
     REGISTER_INVERT_PARSER(TermParser);
     REGISTER_INVERT_PARSER(DummyParser);

@@ -17,13 +17,15 @@
 #include "log.h"
 #include "configure.h"
 #include "forward_index.h"
+#include "json2pb.h"
+#include <google/protobuf/descriptor.h>
 
-std::map<std::string, FieldParser_creater> g_field_parsers;
+using namespace google::protobuf;
 
 struct FieldConfig
 {
     std::string name;
-    std::string parser;
+    std::string pb_name;
     int type;
     int offset;
     int size;
@@ -55,16 +57,6 @@ ForwardIndex::~ForwardIndex()
         delete m_dict;
         m_dict = NULL;
     }
-    __gnu_cxx::hash_map<std::string, FieldDes>::iterator it = m_fields.begin();
-    while (it != m_fields.end())
-    {
-        if (it->second.parser)
-        {
-            delete it->second.parser;
-        }
-        ++it;
-    }
-    m_fields.clear();
 }
 
 int ForwardIndex::init(const char *path, const char *file)
@@ -123,8 +115,8 @@ int ForwardIndex::init(const char *path, const char *file)
         }
         if (SELF_DEFINE_TYPE == field.type)
         {
-            ::snprintf(buffer, sizeof(buffer), "field_%d_parser", i);
-            if (!config.get(buffer, field.parser))
+            ::snprintf(buffer, sizeof(buffer), "field_%d_pb_name", i);
+            if (!config.get(buffer, field.pb_name))
             {
                 WARNING("failed to get %s", buffer);
                 return -1;
@@ -176,6 +168,18 @@ int ForwardIndex::init(const char *path, const char *file)
             }
         }
     }
+    const DescriptorPool *pl = DescriptorPool::generated_pool();
+    if (NULL == pl)
+    {
+        WARNING("failed to get google::protobuf::DescriptorPool");
+        return -1;
+    }
+    MessageFactory *mf = MessageFactory::generated_factory();
+    if (NULL == mf)
+    {
+        WARNING("failed to get google::protobuf::MessageFactory");
+        return -1;
+    }
     for (size_t i = 0; i < fields.size(); ++i)
     {
         FieldDes fd;
@@ -183,29 +187,29 @@ int ForwardIndex::init(const char *path, const char *file)
         if (m_fields.find(fields[i].name) != m_fields.end())
         {
             WARNING("duplicate field name[%s]", fields[i].name.c_str());
-            goto FAIL;
+            return -1;
         }
         fd.offset = fields[i].offset;
         fd.array_offset = fields[i].offset / fields[i].size;
         fd.type = fields[i].type;
         if (SELF_DEFINE_TYPE == fd.type)
         {
-            std::map<std::string, FieldParser_creater>::iterator it = g_field_parsers.find(fields[i].parser);
-            if (it == g_field_parsers.end())
+            const Descriptor *des = pl->FindMessageTypeByName(fields[i].pb_name);
+            if (NULL == des)
             {
-                WARNING("unsupported field parser[%s]", fields[i].parser.c_str());
-                goto FAIL;
+                WARNING("failed to get google::protobuf::Descriptor of [%s]", fields[i].pb_name.c_str());
+                return -1;
             }
-            fd.parser = (*it->second)();
-            if (NULL == fd.parser)
+            fd.default_message = mf->GetPrototype(des);
+            if (NULL == fd.default_message)
             {
-                WARNING("failed to create field parser[%s]", fields[i].parser.c_str());
-                goto FAIL;
+                WARNING("failed to get default message for [%s]", fields[i].pb_name.c_str());
+                return -1;
             }
         }
         else
         {
-            fd.parser = NULL;
+            fd.default_message = NULL;
         }
 
         m_fields.insert(std::make_pair(fields[i].name, fd));
@@ -214,41 +218,41 @@ int ForwardIndex::init(const char *path, const char *file)
     if (NodePool::init_pool(&m_pool) < 0)
     {
         WARNING("failed to call init_pool");
-        goto FAIL;
+        return -1;
     }
     if (m_pool.register_item(m_info_size) < 0)
     {
         WARNING("failed to register info_size to mempool");
-        goto FAIL;
+        return -1;
     }
     if (m_pool.register_item(sizeof(NodePool::ObjectType)) < 0)
     {
         WARNING("failed to register node_size to mempool");
-        goto FAIL;
+        return -1;
     }
     int max_items_num;
     if (!config.get("max_items_num", max_items_num) || max_items_num <= 0)
     {
         WARNING("failed to get max_items_num");
-        goto FAIL;
+        return -1;
     }
     if (m_pool.init(max_items_num) < 0)
     {
         WARNING("failed to init mempool");
-        goto FAIL;
+        return -1;
     }
     m_node_pool.init(&m_pool);
     int bucket_size;
     if (!config.get("bucket_size", bucket_size) || bucket_size <= 0)
     {
         WARNING("failed to get bucket_size");
-        goto FAIL;
+        return -1;
     }
     m_dict = new Hash(bucket_size);
     if (NULL == m_dict)
     {
         WARNING("failed to init hash dict");
-        goto FAIL;
+        return -1;
     }
     m_dict->set_pool(&m_node_pool);
     m_dict->set_cleanup(cleanup, (intptr_t)this);
@@ -258,26 +262,13 @@ int ForwardIndex::init(const char *path, const char *file)
         {
             if (SELF_DEFINE_TYPE == it->second.type)
             {
-                m_cleanup_data.fields_need_free.push_back(
-                        std::make_pair(it->second.array_offset, it->second.parser));
+                m_cleanup_data.fields_need_free.push_back(it->second.array_offset);
             }
             ++it;
         }
     }
     WARNING("max_items_num[%d], bucket_size[%d]", max_items_num, bucket_size);
     return 0;
-FAIL:
-    __gnu_cxx::hash_map<std::string, FieldDes>::iterator it = m_fields.begin();
-    while (it != m_fields.end())
-    {
-        if (it->second.parser)
-        {
-            delete it->second.parser;
-        }
-        ++it;
-    }
-    m_fields.clear();
-    return -1;
 }
 
 int ForwardIndex::get_offset_by_name(const char *name) const
@@ -383,17 +374,40 @@ bool ForwardIndex::update(int32_t id, const std::vector<std::pair<std::string, c
         }
         else
         {
-            FieldParser *parser = it->second.parser;
-            void *ptr = NULL;
-            if (parser->parse(kv.second, ptr))
+            Message *ptr = it->second.default_message->New();
+            if (NULL == ptr)
             {
-                ((void **)mem)[array_offset] = ptr;
-                cd.fields_need_free.push_back(std::make_pair(array_offset, parser));
+                WARNING("failed to new protobuf from default message, field_name[%s]", kv.first.c_str());
+                goto FAIL;
+            }
+            ((void **)mem)[array_offset] = ptr;
+            cd.fields_need_free.push_back(array_offset);
+            if (cJSON_String == kv.second->type)
+            {
+                if (!ptr->ParseFromString(kv.second->valuestring))
+                {
+                    WARNING("failed to parse from json, field_name[%s]", kv.first.c_str());
+                    goto FAIL;
+                }
+            }
+            else if (cJSON_Object == kv.second->type)
+            {
+                if (!json2pb(*ptr, kv.second))
+                {
+                    WARNING("failed to parse from json, field_name[%s]", kv.first.c_str());
+                    goto FAIL;
+                }
+            }
+            else
+            {
+                WARNING("invalid json type, field_name[%s]", kv.first.c_str());
+                goto FAIL;
             }
         }
     }
     if (!m_dict->insert(id, vnew))
     {
+FAIL:
         cd.mem = mem;
         cd.addr = vnew;
         cd.clean();
