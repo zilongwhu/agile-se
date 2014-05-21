@@ -66,7 +66,9 @@ int inc_build_index(inc_builder_t *args)
         int ret = reader.next();
         if (0 == ret)
         {
+            forward.dump("./data");
             ::usleep(10);
+            ::exit(0);
         }
         else if (1 == ret)
         {
