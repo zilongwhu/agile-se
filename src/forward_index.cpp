@@ -691,7 +691,7 @@ bool ForwardIndex::load(const char *dir)
             goto FAIL;
         }
     }
-    WARNING("read dir[%s] ok", dir);
+    WARNING("start to read dir[%s]", dir);
     for (int i = 0; i < total; ++i)
     {
         int32_t key;
@@ -795,6 +795,7 @@ bool ForwardIndex::load(const char *dir)
             goto FAIL;
         }
     }
+    WARNING("read dir[%s] ok", dir);
     if (0)
     {
 FAIL:
