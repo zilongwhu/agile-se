@@ -110,6 +110,7 @@ class ForwardIndex
         Hash *m_dict;
 
         __gnu_cxx::hash_map<std::string, FieldDes> m_fields;
+        std::vector<const google::protobuf::Message *> m_default_messages;
         size_t m_info_size;
         std::string m_meta;
 
