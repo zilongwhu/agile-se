@@ -111,6 +111,7 @@ class ForwardIndex
 
         __gnu_cxx::hash_map<std::string, FieldDes> m_fields;
         size_t m_info_size;
+        std::string m_meta;
 
         cleanup_data_t m_cleanup_data;
         std::deque<cleanup_data_t> m_delayed_list;

@@ -14,6 +14,8 @@
 //
 // =====================================================================================
 
+#include <sstream>
+#include <fstream>
 #include "log.h"
 #include "configure.h"
 #include "forward_index.h"
@@ -67,12 +69,14 @@ int ForwardIndex::init(const char *path, const char *file)
         WARNING("failed parse config[%s:%s]", path, file);
         return -1;
     }
+    std::ostringstream oss;
     int field_num = 0;
     if (!config.get("field_num", field_num) || field_num <= 0)
     {
         WARNING("failed to get field_num");
         return -1;
     }
+    oss << "field_num: " << field_num << std::endl;
     int max_size = 0;
     std::vector<FieldConfig> fields;
     for (int i = 0; i < field_num; ++i)
@@ -86,6 +90,8 @@ int ForwardIndex::init(const char *path, const char *file)
             WARNING("failed to get %s", buffer);
             return -1;
         }
+        oss << buffer << ": " << field.name << std::endl;
+
         ::snprintf(buffer, sizeof(buffer), "field_%d_type", i);
         std::string type;
         if (!config.get(buffer, type))
@@ -113,6 +119,8 @@ int ForwardIndex::init(const char *path, const char *file)
             WARNING("invalid field_type of [%s] = %s", buffer, type.c_str());
             return -1;
         }
+        oss << buffer << ": " << type << std::endl;
+
         if (SELF_DEFINE_TYPE == field.type)
         {
             ::snprintf(buffer, sizeof(buffer), "field_%d_pb_name", i);
@@ -121,6 +129,7 @@ int ForwardIndex::init(const char *path, const char *file)
                 WARNING("failed to get %s", buffer);
                 return -1;
             }
+            oss << buffer << ": " << field.pb_name << std::endl;
         }
         ::snprintf(buffer, sizeof(buffer), "field_%d_offset", i);
         if (!config.get(buffer, field.offset))
@@ -133,6 +142,8 @@ int ForwardIndex::init(const char *path, const char *file)
             WARNING("invalid %s[%d] of field[%s]", buffer, field.offset, field.name.c_str());
             return -1;
         }
+        oss << buffer << ": " << field.offset << std::endl;
+
         fields.push_back(field);
         if (max_size < field.offset + field.size)
         {
@@ -140,6 +151,7 @@ int ForwardIndex::init(const char *path, const char *file)
         }
     }
     WARNING("info_size = %d", max_size);
+    oss << "info_size: " << max_size << std::endl;
 
     std::vector<int> placeholder(max_size, -1);
     for (size_t i = 0; i < fields.size(); ++i)
@@ -267,6 +279,7 @@ int ForwardIndex::init(const char *path, const char *file)
             ++it;
         }
     }
+    m_meta = oss.str();
     WARNING("max_items_num[%d], bucket_size[%d]", max_items_num, bucket_size);
     return 0;
 }
@@ -485,6 +498,15 @@ bool ForwardIndex::dump(const char *dir) const
     {
         WARNING("failed to init buffer");
         goto FAIL;
+    }
+    {
+        std::ofstream ofs((path + "forward.meta").c_str());
+        ofs << "total: " << size << std::endl << m_meta;
+        if (!ofs)
+        {
+            WARNING("failed to write meta info");
+            goto FAIL;
+        }
     }
 
     if (::fwrite(&size, sizeof(size), 1, idx) != 1)
