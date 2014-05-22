@@ -227,6 +227,7 @@ int ForwardIndex::init(const char *path, const char *file)
         m_fields.insert(std::make_pair(fields[i].name, fd));
     }
     m_info_size = max_size;
+    m_default_messages.resize(m_info_size/sizeof(void *), NULL);
     if (NodePool::init_pool(&m_pool) < 0)
     {
         WARNING("failed to call init_pool");
@@ -275,9 +276,11 @@ int ForwardIndex::init(const char *path, const char *file)
             if (SELF_DEFINE_TYPE == it->second.type)
             {
                 m_cleanup_data.fields_need_free.push_back(it->second.array_offset);
+                m_default_messages[it->second.array_offset] = it->second.default_message;
             }
             ++it;
         }
+        std::sort(m_cleanup_data.fields_need_free.begin(), m_cleanup_data.fields_need_free.end());
     }
     m_meta = oss.str();
     WARNING("max_items_num[%d], bucket_size[%d]", max_items_num, bucket_size);
@@ -557,18 +560,7 @@ bool ForwardIndex::dump(const char *dir) const
                     goto FAIL;
                 }
                 uint32_t len = message->ByteSize();
-                if (sizeof(void *) == sizeof(uint32_t))
-                {
-                    uint16_t *arr = (uint16_t *)message;
-                    arr[0] = length;
-                    arr[1] = len;
-                }
-                else
-                {
-                    uint32_t *arr = (uint32_t *)message;
-                    arr[0] = length;
-                    arr[1] = len;
-                }
+                ((Message **)mem)[self_defines[i]] = (Message *)(intptr_t)len;
                 length += len;
             }
         }
@@ -596,6 +588,213 @@ bool ForwardIndex::dump(const char *dir) const
         ++it;
     }
     WARNING("write to dir[%s] ok", dir);
+    if (0)
+    {
+FAIL:
+        ret = false;
+    }
+    ::fclose(data);
+    ::fclose(idx);
+    if (buffer)
+    {
+        delete [] buffer;
+    }
+    return ret;
+}
+
+bool ForwardIndex::load(const char *dir)
+{
+    if (NULL == dir || '\0' == *dir)
+    {
+        WARNING("empty dir error");
+        return false;
+    }
+    WARNING("start to read dir[%s]", dir);
+    std::string path(dir);
+    if ('/' != path[path.length() - 1])
+    {
+        path += "/";
+    }
+    int total = 0;
+    int info_size = 0;
+    {
+        Config config(std::string(path.c_str(), path.length() - 1).c_str(), "forward.meta");
+        if (config.parse() < 0)
+        {
+            WARNING("failed parse config[%sforward.meta]", path.c_str());
+            return false;
+        }
+        if (!config.get("total", total) || total < 0)
+        {
+            WARNING("failed to get total");
+            return false;
+        }
+        if (!config.get("info_size", info_size) || info_size <= 0)
+        {
+            WARNING("failed to get info_size");
+            return false;
+        }
+        WARNING("total=%d, m_info_size=%d, info_size=%d", total, int(m_info_size), info_size);
+        if (int(m_info_size) < info_size)
+        {
+            WARNING("m_info_size is smaller, error");
+            return false;
+        }
+    }
+    FILE *idx = ::fopen((path + "forward.idx").c_str(), "rb");
+    if (NULL == idx)
+    {
+        WARNING("failed to open file[%sforward.idx] for read", path.c_str());
+        return false;
+    }
+    FILE *data = ::fopen((path + "forward.data").c_str(), "rb");
+    if (NULL == data)
+    {
+        ::fclose(idx);
+
+        WARNING("failed to open file[%sforward.data] for read", path.c_str());
+        return false;
+    }
+    bool ret = true;
+    size_t offset = 0;
+    Message *message = NULL;
+    const std::vector<int> &self_defines = m_cleanup_data.fields_need_free;
+
+    size_t buffer_size = 1024*1024;
+    buffer_size = int(buffer_size) > info_size ? buffer_size : info_size;
+    char *buffer = new char[buffer_size];
+    if (NULL == buffer)
+    {
+        WARNING("failed to init buffer");
+        goto FAIL;
+    }
+    {
+        size_t tmp = 0;
+        if (::fread(&tmp, sizeof(tmp), 1, idx) != 1)
+        {
+            WARNING("failed to read size from idx");
+            goto FAIL;
+        }
+        if (int(tmp) != total)
+        {
+            WARNING("meta show total=%d, buf idx say total=%d", total, int(tmp));
+            goto FAIL;
+        }
+        if (::fread(&tmp, sizeof(tmp), 1, idx) != 1)
+        {
+            WARNING("failed to read info_size from idx");
+            goto FAIL;
+        }
+        if (int(tmp) != info_size)
+        {
+            WARNING("meta show info_size=%d, buf idx say info_size=%d", info_size, int(tmp));
+            goto FAIL;
+        }
+    }
+    WARNING("read dir[%s] ok", dir);
+    for (int i = 0; i < total; ++i)
+    {
+        int32_t key;
+        size_t tmp;                             /* offset */
+        uint32_t length;
+
+        if (::fread(&key, sizeof(key), 1, idx) != 1)
+        {
+            WARNING("failed to get key from idx, i=%d", i);
+            goto FAIL;
+        }
+        if (::fread(&tmp, sizeof(tmp), 1, idx) != 1)
+        {
+            WARNING("failed to get offset from idx, i=%d", i);
+            goto FAIL;
+        }
+        if (tmp != offset)
+        {
+            WARNING("offset error, offset from idx=%lu, real offset=%lu, i=%d", (uint64_t)tmp, (uint64_t)offset, i);
+            goto FAIL;
+        }
+        if (::fread(&length, sizeof(length), 1, idx) != 1)
+        {
+            WARNING("failed to get length from idx, i=%d", i);
+            goto FAIL;
+        }
+        if (length > buffer_size)
+        {
+            char *new_buffer = new char[length];
+            if (NULL == new_buffer)
+            {
+                WARNING("failed to new buffer, length=%u", length);
+                goto FAIL;
+            }
+            delete [] buffer;
+            buffer = new_buffer;
+            buffer_size = length;
+        }
+        if (::fread(buffer, length, 1, data) != 1)
+        {
+            WARNING("failed to get data, i=%d", i);
+            goto FAIL;
+        }
+        offset += length;
+        vaddr_t vnew = m_pool.alloc(m_info_size);
+        void *mem = m_pool.addr(vnew);
+        if (NULL == mem)
+        {
+            WARNING("failed to alloc mem, i=%d", i);
+            goto FAIL;
+        }
+        ::memcpy(mem, buffer, info_size);
+        if (int(m_info_size) > info_size)
+        {
+            ::memset(mem, info_size, m_info_size - info_size);
+        }
+        uint32_t len = info_size;
+        bool fail = false;
+        for (size_t n = 0; n < self_defines.size(); ++n)
+        {
+            if (int((self_defines[n] + 1) * sizeof(void *)) > info_size)
+            {
+                break;
+            }
+            uint32_t tmp_len = (uint32_t)(intptr_t)((void **)mem)[self_defines[n]];
+            if (tmp_len > 0)
+            {
+                message = m_default_messages[self_defines[n]]->New();
+                if (NULL == message)
+                {
+                    WARNING("failed to create message");
+                    fail = true;
+                }
+                else if (!message->ParseFromArray(buffer + len, tmp_len))
+                {
+                    WARNING("failed to deserialize message");
+                    fail = true;
+                }
+            }
+            else
+            {
+                message = NULL;
+            }
+            ((Message **)mem)[self_defines[n]] = message;
+            len += tmp_len;
+        }
+        if (len != length)
+        {
+            m_cleanup_data.mem = mem;
+            m_cleanup_data.addr = vnew;
+            m_cleanup_data.clean();
+            WARNING("corrupted data file");
+            goto FAIL;
+        }
+        if (fail || !m_dict->insert(key, vnew))
+        {
+            m_cleanup_data.mem = mem;
+            m_cleanup_data.addr = vnew;
+            m_cleanup_data.clean();
+            WARNING("failed to insert key=%d, i=%d", key, i);
+            goto FAIL;
+        }
+    }
     if (0)
     {
 FAIL:
