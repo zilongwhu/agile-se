@@ -92,6 +92,9 @@ class InvertIndex
         }
         void print_meta() const;
         void print_list_length();
+
+        bool load(const char *dir);
+        bool dump(const char *dir);
     private:
         DocList *trigger(uint32_t sign) const;
         bool insert(const char *keystr, uint8_t type, int32_t docid, void *payload);
