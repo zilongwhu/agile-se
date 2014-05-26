@@ -189,6 +189,9 @@ class SignDict
         }
 
         const uint32_t idnum() const { return m_max_id - 1; }
+
+        bool dump(const char *dir) const;
+        bool load(const char *dir);
     private:
         Hash *m_dict;
         char *m_buffer;

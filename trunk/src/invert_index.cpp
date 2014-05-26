@@ -1421,3 +1421,328 @@ void InvertIndex::mergeAll(uint32_t length)
     timer.stop();
     WARNING("merge del signs ok, all length=%lu, time=%ld ms", (uint64_t)len2, timer.timeInMs());
 }
+
+bool InvertIndex::dump(const char *dir)
+{
+    if (NULL == dir || '\0' == *dir)
+    {
+        WARNING("empty dir error");
+        return false;
+    }
+    WARNING("start to write dir[%s]", dir);
+    std::string path(dir);
+    if ('/' != path[path.length() - 1])
+    {
+        path += "/";
+    }
+    this->mergeAll(m_merge_all_threshold);
+    {
+        FILE *idx = ::fopen((path + "invert.idx").c_str(), "wb");
+        if (NULL == idx)
+        {
+            WARNING("failed to open file[%sinvert.idx] for write", path.c_str());
+            return false;
+        }
+        FILE *data = ::fopen((path + "invert.data").c_str(), "wb");
+        if (NULL == data)
+        {
+            ::fclose(idx);
+
+            WARNING("failed to open file[%sinvert.data] for write", path.c_str());
+            return false;
+        }
+        FILE *meta = ::fopen((path + "invert_list.meta").c_str(), "w");
+        if (NULL == meta)
+        {
+            ::fclose(data);
+            ::fclose(idx);
+
+            WARNING("failed to open file[%sinvert_list.meta] for write", path.c_str());
+            return false;
+        }
+        std::string word;
+        size_t total_len = 0;
+        size_t offset = 0;
+        Hash::iterator it = m_dict->begin();
+        while (it)
+        {
+            bl_head_t *pl = (bl_head_t *)it.value();
+            uint32_t length = (sizeof(bl_head_t) + sizeof(int32_t) * pl->doc_num + pl->payload_len * pl->doc_num);
+            if (::fwrite(pl, length, 1, data) != 1)
+            {
+                WARNING("failed to write data, length=%u, offset=%lu", length, (uint64_t)offset);
+                goto FAIL0;
+            }
+            if (::fwrite(&it.key(), sizeof(it.key()), 1, idx) != 1)
+            {
+                WARNING("failed to write key to idx");
+                goto FAIL0;
+            }
+            if (::fwrite(&offset, sizeof(offset), 1, idx) != 1)
+            {
+                WARNING("failed to write offset to idx");
+                goto FAIL0;
+            }
+            if (::fwrite(&length, sizeof(length), 1, idx) != 1)
+            {
+                WARNING("failed to write length to idx");
+                goto FAIL0;
+            }
+            if (0)
+            {
+FAIL0:
+                ::fclose(meta);
+                ::fclose(data);
+                ::fclose(idx);
+                return false;
+            }
+
+            m_sign2id.find(it.key(), word);
+            ::fprintf(meta, "%s : %d\n", word.c_str(), pl->doc_num);
+
+            offset += length;
+            total_len += pl->doc_num;
+            ++it;
+        }
+        ::fprintf(meta, "total_len : %lu\n", (uint64_t)total_len);
+
+        ::fclose(meta);
+        ::fclose(data);
+        ::fclose(idx);
+        WARNING("write invert index ok");
+    }
+    {
+        FILE *idx = ::fopen((path + "add.idx").c_str(), "wb");
+        if (NULL == idx)
+        {
+            WARNING("failed to open file[%sadd.idx] for write", path.c_str());
+            return false;
+        }
+        FILE *data = ::fopen((path + "add.data").c_str(), "wb");
+        if (NULL == data)
+        {
+            ::fclose(idx);
+
+            WARNING("failed to open file[%sadd.data] for write", path.c_str());
+            return false;
+        }
+        size_t offset = 0;
+        VHash::iterator it = m_add_dict->begin();
+        while (it)
+        {
+            uint32_t tmp = 0;
+            uint32_t length = 0;
+            int32_t docid = 0;
+            SkipList *list = m_skiplist_pool.addr(it.value());
+            SkipList::iterator sit = list->begin();
+            SkipList::iterator end = list->end();
+            if (sit == end)
+            {
+                continue;
+            }
+            while (sit != end)
+            {
+                docid = *sit;
+                if (::fwrite(&docid, sizeof(docid), 1, data) != 1)
+                {
+                    WARNING("failed to write docid to data");
+                    goto FAIL1;
+                }
+                length += sizeof(docid);
+                if (list->payload_len() > 0)
+                {
+                    if (::fwrite(sit.payload(), list->payload_len(), 1, data) != 1)
+                    {
+                        WARNING("failed to write payload to data");
+                        goto FAIL1;
+                    }
+                    length += list->payload_len();
+                }
+                ++sit;
+            }
+            if (::fwrite(&it.key(), sizeof(it.key()), 1, idx) != 1)
+            {
+                WARNING("failed to write key to idx");
+                goto FAIL1;
+            }
+            tmp = list->type();
+            if (::fwrite(&tmp, sizeof(tmp), 1, idx) != 1)
+            {
+                WARNING("failed to write type to idx");
+                goto FAIL1;
+            }
+            tmp = list->payload_len();
+            if (::fwrite(&tmp, sizeof(tmp), 1, idx) != 1)
+            {
+                WARNING("failed to write payload length to idx");
+                goto FAIL1;
+            }
+            if (::fwrite(&offset, sizeof(offset), 1, idx) != 1)
+            {
+                WARNING("failed to write offset to idx");
+                goto FAIL1;
+            }
+            if (::fwrite(&length, sizeof(length), 1, idx) != 1)
+            {
+                WARNING("failed to write length to idx");
+                goto FAIL1;
+            }
+            if (0)
+            {
+FAIL1:
+                ::fclose(data);
+                ::fclose(idx);
+                return false;
+            }
+            offset += length;
+            ++it;
+        }
+        ::fclose(data);
+        ::fclose(idx);
+        WARNING("write add invert index ok");
+    }
+    {
+        FILE *idx = ::fopen((path + "del.idx").c_str(), "wb");
+        if (NULL == idx)
+        {
+            WARNING("failed to open file[%sdel.idx] for write", path.c_str());
+            return false;
+        }
+        FILE *data = ::fopen((path + "del.data").c_str(), "wb");
+        if (NULL == data)
+        {
+            ::fclose(idx);
+
+            WARNING("failed to open file[%sdel.data] for write", path.c_str());
+            return false;
+        }
+        size_t offset = 0;
+        VHash::iterator it = m_del_dict->begin();
+        while (it)
+        {
+            uint32_t length = 0;
+            int32_t docid = 0;
+            SkipList *list = m_skiplist_pool.addr(it.value());
+            SkipList::iterator sit = list->begin();
+            SkipList::iterator end = list->end();
+            if (sit == end)
+            {
+                continue;
+            }
+            while (sit != end)
+            {
+                docid = *sit;
+                if (::fwrite(&docid, sizeof(docid), 1, data) != 1)
+                {
+                    WARNING("failed to write docid to data");
+                    goto FAIL2;
+                }
+                length += sizeof(docid);
+                ++sit;
+            }
+            if (::fwrite(&it.key(), sizeof(it.key()), 1, idx) != 1)
+            {
+                WARNING("failed to write key to idx");
+                goto FAIL2;
+            }
+            if (::fwrite(&offset, sizeof(offset), 1, idx) != 1)
+            {
+                WARNING("failed to write offset to idx");
+                goto FAIL2;
+            }
+            if (::fwrite(&length, sizeof(length), 1, idx) != 1)
+            {
+                WARNING("failed to write length to idx");
+                goto FAIL2;
+            }
+            if (0)
+            {
+FAIL2:
+                ::fclose(data);
+                ::fclose(idx);
+                return false;
+            }
+            offset += length;
+            ++it;
+        }
+        ::fclose(data);
+        ::fclose(idx);
+        WARNING("write del invert index ok");
+    }
+    {
+        FILE *idx = ::fopen((path + "docid2signs.idx").c_str(), "wb");
+        if (NULL == idx)
+        {
+            WARNING("failed to open file[%sdocid2signs.idx] for write", path.c_str());
+            return false;
+        }
+        FILE *data = ::fopen((path + "docid2signs.data").c_str(), "wb");
+        if (NULL == data)
+        {
+            ::fclose(idx);
+
+            WARNING("failed to open file[%sdocid2signs.data] for write", path.c_str());
+            return false;
+        }
+        size_t offset = 0;
+        VHash::iterator it = m_docid2signs->begin();
+        while (it)
+        {
+            uint32_t length = 0;
+            uint32_t sign = 0;
+            IDList *list = m_idlist_pool.addr(it.value());
+            IDList::iterator sit = list->begin();
+            IDList::iterator end = list->end();
+            if (sit == end)
+            {
+                continue;
+            }
+            while (sit != end)
+            {
+                sign = *sit;
+                if (::fwrite(&sign, sizeof(sign), 1, data) != 1)
+                {
+                    WARNING("failed to write sign to data");
+                    goto FAIL3;
+                }
+                length += sizeof(sign);
+                ++sit;
+            }
+            if (::fwrite(&it.key(), sizeof(it.key()), 1, idx) != 1)
+            {
+                WARNING("failed to write key to idx");
+                goto FAIL3;
+            }
+            if (::fwrite(&offset, sizeof(offset), 1, idx) != 1)
+            {
+                WARNING("failed to write offset to idx");
+                goto FAIL3;
+            }
+            if (::fwrite(&length, sizeof(length), 1, idx) != 1)
+            {
+                WARNING("failed to write length to idx");
+                goto FAIL3;
+            }
+            if (0)
+            {
+FAIL3:
+                ::fclose(data);
+                ::fclose(idx);
+                return false;
+            }
+            offset += length;
+            ++it;
+        }
+        ::fclose(data);
+        ::fclose(idx);
+        WARNING("write docid=>signs ok");
+    }
+    bool ret = this->m_sign2id.dump(dir);
+    WARNING("write dir[%s] ok", dir);
+    return ret;
+}
+
+bool InvertIndex::load(const char *dir)
+{
+    return false;
+}
