@@ -67,6 +67,7 @@ int inc_build_index(inc_builder_t *args)
         if (0 == ret)
         {
             forward.dump("./data");
+            invert.dump("./data");
             ::usleep(10);
             ::exit(0);
         }

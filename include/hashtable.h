@@ -162,28 +162,13 @@ class HashTable
         }
         ~HashTable()
         {
+            this->clear();
             if (m_buckets)
             {
-                if (m_size > 0)
-                {
-                    vaddr_t cur;
-                    node_t *node;
-                    for (size_t i = 0; i < m_bucket_size; ++i)
-                    {
-                        while (0 != m_buckets[i])
-                        {
-                            cur = m_buckets[i];
-                            node = m_pool->addr(cur);
-                            m_buckets[i] = node->next;
-                            m_pool->delay_free(cur, m_cleanup_fun, m_cleanup_arg);
-                        }
-                    }
-                }
                 delete [] m_buckets;
                 m_buckets = NULL;
             }
             m_bucket_size = 0;
-            m_size = 0;
             m_pool = NULL;
             m_cleanup_fun = NULL;
             m_cleanup_arg = 0;
@@ -203,6 +188,26 @@ class HashTable
             return sizeof(*this)
                 + sizeof(vaddr_t) * m_bucket_size
                 + m_size * sizeof(node_t);
+        }
+
+        void clear()
+        {
+            if (m_buckets && m_size > 0)
+            {
+                vaddr_t cur;
+                node_t *node;
+                for (size_t i = 0; i < m_bucket_size; ++i)
+                {
+                    while (0 != m_buckets[i])
+                    {
+                        cur = m_buckets[i];
+                        node = m_pool->addr(cur);
+                        m_buckets[i] = node->next;
+                        m_pool->delay_free(cur, m_cleanup_fun, m_cleanup_arg);
+                    }
+                }
+            }
+            m_size = 0;
         }
 
         iterator begin() const

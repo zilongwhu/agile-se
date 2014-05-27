@@ -1430,6 +1430,7 @@ bool InvertIndex::dump(const char *dir)
         return false;
     }
     WARNING("start to write dir[%s]", dir);
+    uint32_t key;
     std::string path(dir);
     if ('/' != path[path.length() - 1])
     {
@@ -1473,7 +1474,8 @@ bool InvertIndex::dump(const char *dir)
                 WARNING("failed to write data, length=%u, offset=%lu", length, (uint64_t)offset);
                 goto FAIL0;
             }
-            if (::fwrite(&it.key(), sizeof(it.key()), 1, idx) != 1)
+            key = it.key();
+            if (::fwrite(&key, sizeof(key), 1, idx) != 1)
             {
                 WARNING("failed to write key to idx");
                 goto FAIL0;
@@ -1497,7 +1499,7 @@ FAIL0:
                 return false;
             }
 
-            m_sign2id.find(it.key(), word);
+            m_sign2id.find(key, word);
             ::fprintf(meta, "%s : %d\n", word.c_str(), pl->doc_num);
 
             offset += length;
@@ -1560,7 +1562,8 @@ FAIL0:
                 }
                 ++sit;
             }
-            if (::fwrite(&it.key(), sizeof(it.key()), 1, idx) != 1)
+            key = it.key();
+            if (::fwrite(&key, sizeof(key), 1, idx) != 1)
             {
                 WARNING("failed to write key to idx");
                 goto FAIL1;
@@ -1640,7 +1643,8 @@ FAIL1:
                 length += sizeof(docid);
                 ++sit;
             }
-            if (::fwrite(&it.key(), sizeof(it.key()), 1, idx) != 1)
+            key = it.key();
+            if (::fwrite(&key, sizeof(key), 1, idx) != 1)
             {
                 WARNING("failed to write key to idx");
                 goto FAIL2;
@@ -1708,7 +1712,8 @@ FAIL2:
                 length += sizeof(sign);
                 ++sit;
             }
-            if (::fwrite(&it.key(), sizeof(it.key()), 1, idx) != 1)
+            key = it.key();
+            if (::fwrite(&key, sizeof(key), 1, idx) != 1)
             {
                 WARNING("failed to write key to idx");
                 goto FAIL3;
@@ -1744,5 +1749,383 @@ FAIL3:
 
 bool InvertIndex::load(const char *dir)
 {
-    return false;
+    if (NULL == dir || '\0' == *dir)
+    {
+        WARNING("empty dir error");
+        return false;
+    }
+    WARNING("start to read dir[%s]", dir);
+    uint32_t key;
+    std::string path(dir);
+    if ('/' != path[path.length() - 1])
+    {
+        path += "/";
+    }
+    if (!this->m_sign2id.load(dir))
+    {
+        WARNING("failed to load signdict");
+        return false;
+    }
+    {
+        FILE *idx = ::fopen((path + "invert.idx").c_str(), "rb");
+        if (NULL == idx)
+        {
+            WARNING("failed to open file[%sinvert.idx] for read", path.c_str());
+            return false;
+        }
+        FILE *data = ::fopen((path + "invert.data").c_str(), "rb");
+        if (NULL == data)
+        {
+            ::fclose(idx);
+
+            WARNING("failed to open file[%sinvert.data] for read", path.c_str());
+            return false;
+        }
+        size_t offset = 0;
+        size_t tmp;
+        uint32_t length;
+        while (1)
+        {
+            if (::fread(&key, sizeof(key), 1, idx) != 1)
+            {
+                break;
+            }
+            if (::fread(&tmp, sizeof(tmp), 1, idx) != 1)
+            {
+                WARNING("failed to read offset from idx");
+                goto FAIL0;
+            }
+            if (::fread(&length, sizeof(length), 1, idx) != 1)
+            {
+                WARNING("failed to read length from idx");
+                goto FAIL0;
+            }
+            if (tmp != offset)
+            {
+                WARNING("offset check error");
+                goto FAIL0;
+            }
+            if (length <= int(sizeof(bl_head_t) + sizeof(int32_t)))
+            {
+                WARNING("invalid length");
+                goto FAIL0;
+            }
+            void *mem = ::malloc(length);
+            bl_head_t *pl = (bl_head_t *)mem;
+            if (NULL == mem)
+            {
+                WARNING("failed to alloc mem, length=%u", length);
+                goto FAIL0;
+            }
+            if (::fread(mem, 1, length, data) != length)
+            {
+                ::free(mem);
+                WARNING("failed to read data");
+                goto FAIL0;
+            }
+            if (length != (uint32_t)(sizeof(bl_head_t)
+                        + sizeof(int32_t) * pl->doc_num + pl->payload_len * pl->doc_num))
+            {
+                ::free(mem);
+                WARNING("failed to check length");
+                goto FAIL0;
+            }
+            if (!m_dict->insert(key, mem))
+            {
+                ::free(mem);
+                WARNING("failed to insert into m_dict");
+                goto FAIL0;
+            }
+            offset += length;
+            if (0)
+            {
+FAIL0:
+                ::fclose(data);
+                ::fclose(idx);
+                return false;
+            }
+        }
+        ::fclose(data);
+        ::fclose(idx);
+        WARNING("read invert index ok");
+    }
+    {
+        FILE *idx = ::fopen((path + "add.idx").c_str(), "rb");
+        if (NULL == idx)
+        {
+            WARNING("failed to open file[%sadd.idx] for read", path.c_str());
+            return false;
+        }
+        FILE *data = ::fopen((path + "add.data").c_str(), "rb");
+        if (NULL == data)
+        {
+            ::fclose(idx);
+
+            WARNING("failed to open file[%sadd.data] for read", path.c_str());
+            return false;
+        }
+        size_t offset = 0;
+        size_t tmp;
+        uint32_t type;
+        uint32_t payload_len;
+        uint32_t length;
+        int32_t docid;
+        char *payload;
+        while (1)
+        {
+            if (::fread(&key, sizeof(key), 1, idx) != 1)
+            {
+                break;
+            }
+            if (::fread(&type, sizeof(type), 1, idx) != 1)
+            {
+                WARNING("failed to read type from idx");
+                goto FAIL1;
+            }
+            if (::fread(&payload_len, sizeof(payload_len), 1, idx) != 1)
+            {
+                WARNING("failed to read payload length from idx");
+                goto FAIL1;
+            }
+            if (::fread(&tmp, sizeof(tmp), 1, idx) != 1)
+            {
+                WARNING("failed to read offset from idx");
+                goto FAIL1;
+            }
+            if (::fread(&length, sizeof(length), 1, idx) != 1)
+            {
+                WARNING("failed to read length from idx");
+                goto FAIL1;
+            }
+            if (tmp != offset)
+            {
+                WARNING("offset check error");
+                goto FAIL1;
+            }
+            payload = NULL;
+            if (payload_len > 0)
+            {
+                payload = new (std::nothrow) char[payload_len];
+                if (NULL == payload)
+                {
+                    WARNING("failed to alloc payload, payload length is %u", payload_len);
+                    goto FAIL1;
+                }
+            }
+            vaddr_t vlist = m_skiplist_pool.alloc(&m_pool, type, payload_len);
+            SkipList *list = m_skiplist_pool.addr(vlist);
+            if (NULL == list)
+            {
+                WARNING("failed to alloc skiplist");
+                goto FAIL1;
+            }
+            if (!m_add_dict->insert(key, vlist))
+            {
+                m_skiplist_pool.free(vlist);
+
+                WARNING("failed to alloc skiplist");
+                goto FAIL1;
+            }
+            for (uint32_t i = 0; i < length; i += sizeof(docid) + payload_len)
+            {
+                if (::fread(&docid, sizeof(docid), 1, data) != 1)
+                {
+                    WARNING("failed to read docid from data");
+                    goto FAIL1;
+                }
+                if (payload_len > 0 && ::fread(payload, payload_len, 1, data) != 1)
+                {
+                    WARNING("failed to read payload from data");
+                    goto FAIL1;
+                }
+                if (!list->insert(docid, payload))
+                {
+                    WARNING("failed to insert docid to skiplist");
+                    goto FAIL1;
+                }
+            }
+            if (payload)
+            {
+                delete [] payload;
+                payload = NULL;
+            }
+            offset += length;
+            if (0)
+            {
+FAIL1:
+                if (payload)
+                {
+                    delete [] payload;
+                }
+                ::fclose(data);
+                ::fclose(idx);
+                return false;
+            }
+        }
+        ::fclose(data);
+        ::fclose(idx);
+        WARNING("read add invert index ok");
+    }
+    {
+        FILE *idx = ::fopen((path + "del.idx").c_str(), "rb");
+        if (NULL == idx)
+        {
+            WARNING("failed to open file[%sdel.idx] for read", path.c_str());
+            return false;
+        }
+        FILE *data = ::fopen((path + "del.data").c_str(), "rb");
+        if (NULL == data)
+        {
+            ::fclose(idx);
+
+            WARNING("failed to open file[%sdel.data] for read", path.c_str());
+            return false;
+        }
+        size_t offset = 0;
+        size_t tmp;
+        uint32_t length;
+        int32_t docid;
+        while (1)
+        {
+            if (::fread(&key, sizeof(key), 1, idx) != 1)
+            {
+                break;
+            }
+            if (::fread(&tmp, sizeof(tmp), 1, idx) != 1)
+            {
+                WARNING("failed to read offset from idx");
+                goto FAIL2;
+            }
+            if (::fread(&length, sizeof(length), 1, idx) != 1)
+            {
+                WARNING("failed to read length from idx");
+                goto FAIL2;
+            }
+            if (tmp != offset)
+            {
+                WARNING("offset check error");
+                goto FAIL2;
+            }
+            vaddr_t vlist = m_skiplist_pool.alloc(&m_pool, 0xFF, 0);
+            SkipList *list = m_skiplist_pool.addr(vlist);
+            if (NULL == list)
+            {
+                WARNING("failed to alloc skiplist");
+                goto FAIL2;
+            }
+            if (!m_del_dict->insert(key, vlist))
+            {
+                m_skiplist_pool.free(vlist);
+
+                WARNING("failed to alloc skiplist");
+                goto FAIL2;
+            }
+            for (uint32_t i = 0; i < length; i += sizeof(docid))
+            {
+                if (::fread(&docid, sizeof(docid), 1, data) != 1)
+                {
+                    WARNING("failed to read docid from data");
+                    goto FAIL2;
+                }
+                if (!list->insert(docid, NULL))
+                {
+                    WARNING("failed to insert docid to skiplist");
+                    goto FAIL2;
+                }
+            }
+            offset += length;
+            if (0)
+            {
+FAIL2:
+                ::fclose(data);
+                ::fclose(idx);
+                return false;
+            }
+        }
+        ::fclose(data);
+        ::fclose(idx);
+        WARNING("read del invert index ok");
+    }
+    {
+        FILE *idx = ::fopen((path + "docid2signs.idx").c_str(), "rb");
+        if (NULL == idx)
+        {
+            WARNING("failed to open file[%sdocid2signs.idx] for read", path.c_str());
+            return false;
+        }
+        FILE *data = ::fopen((path + "docid2signs.data").c_str(), "rb");
+        if (NULL == data)
+        {
+            ::fclose(idx);
+
+            WARNING("failed to open file[%sdocid2signs.data] for read", path.c_str());
+            return false;
+        }
+        size_t offset = 0;
+        size_t tmp;
+        uint32_t length;
+        uint32_t sign;
+        while (1)
+        {
+            if (::fread(&key, sizeof(key), 1, idx) != 1)
+            {
+                break;
+            }
+            if (::fread(&tmp, sizeof(tmp), 1, idx) != 1)
+            {
+                WARNING("failed to read offset from idx");
+                goto FAIL3;
+            }
+            if (::fread(&length, sizeof(length), 1, idx) != 1)
+            {
+                WARNING("failed to read length from idx");
+                goto FAIL3;
+            }
+            if (tmp != offset)
+            {
+                WARNING("offset check error");
+                goto FAIL3;
+            }
+            vaddr_t vlist = m_idlist_pool.alloc(&m_inode_pool);
+            IDList *list = m_idlist_pool.addr(vlist);
+            if (NULL == list)
+            {
+                WARNING("failed to alloc idlist");
+                goto FAIL3;
+            }
+            if (!m_docid2signs->insert(key, vlist))
+            {
+                m_idlist_pool.free(vlist);
+
+                WARNING("failed to insert idlist");
+                goto FAIL3;
+            }
+            for (uint32_t i = 0; i < length; i += sizeof(sign))
+            {
+                if (::fread(&sign, sizeof(sign), 1, data) != 1)
+                {
+                    WARNING("failed to read sign from data");
+                    goto FAIL3;
+                }
+                if (!list->insert(sign))
+                {
+                    WARNING("failed to insert sign to idlist");
+                    goto FAIL3;
+                }
+            }
+            offset += length;
+            if (0)
+            {
+FAIL3:
+                ::fclose(data);
+                ::fclose(idx);
+                return false;
+            }
+        }
+        ::fclose(data);
+        ::fclose(idx);
+        WARNING("read docid=>signs ok");
+    }
+    WARNING("read dir[%s] ok", dir);
+    return true;
 }
