@@ -356,13 +356,16 @@ int main(int argc, char *argv[])
         return -1;
     }
 
+    DualDir dir;
+    dir.init("./data");
+
     inc_builder_t args;
     args.forward = &forward;
     args.invert = &invert;
     args.reader = &reader;
-    args.dump_interval = 3600;
-    args.print_meta_interval = 600;
-    args.dump_path = "./data";
+    args.dump_interval = 60;
+    args.print_meta_interval = 60;
+    args.dump_dir = &dir;
 
     inc_build_index(&args);
 
