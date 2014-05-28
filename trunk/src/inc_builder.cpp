@@ -32,7 +32,7 @@ int inc_build_index(inc_builder_t *args)
     uint32_t update_invert_count = 0;
     uint32_t update_forward_count = 0;
     uint32_t last_print_time = now;
-    uint32_t last_merge_time = now;
+    uint32_t last_dump_time = now;
 
     std::vector<invert_data_t> items;
     std::vector<std::pair<std::string, std::string> > kvs;
@@ -46,16 +46,18 @@ int inc_build_index(inc_builder_t *args)
             forward.recycle();
             invert.recycle();
 
-            if (last_print_time + 3600 < g_now_time)
+            if (last_print_time + args->print_meta_interval < g_now_time)
             {
                 forward.print_meta();
                 invert.print_meta();
+                invert.print_list_length();
                 last_print_time = g_now_time;
             }
-            if (last_merge_time + 3600 < g_now_time)
+            if (last_dump_time + args->dump_interval < g_now_time)
             {
-                invert.print_list_length();
-                last_merge_time = g_now_time;
+                forward.dump(args->dump_path.c_str());
+                invert.dump(args->dump_path.c_str());
+                last_dump_time = g_now_time;
             }
 
             delete_count = 0;
@@ -66,10 +68,7 @@ int inc_build_index(inc_builder_t *args)
         int ret = reader.next();
         if (0 == ret)
         {
-            forward.dump("./data");
-            invert.dump("./data");
             ::usleep(10);
-            ::exit(0);
         }
         else if (1 == ret)
         {
