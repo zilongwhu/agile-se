@@ -33,6 +33,7 @@ struct InvertTypes
 {
     struct InvertType types[256];               /*  invert type is offset */
     SignDict *sign2id_dict;
+    std::string m_meta;
 
     InvertTypes()
     {
@@ -125,6 +126,7 @@ struct InvertTypes
             types[i].type = 0xFF;
         }
         sign2id_dict = NULL;
+        m_meta.clear();
     }
 };
 

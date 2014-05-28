@@ -14,6 +14,7 @@
 //
 // =====================================================================================
 
+#include <sstream>
 #include "log.h"
 #include "configure.h"
 #include "invert_type.h"
@@ -22,6 +23,7 @@ std::map<std::string, InvertParser_creater> g_invert_parsers;
 
 int InvertTypes::init(const char *path, const char *file)
 {
+    std::ostringstream oss;
     Config config(path, file);
     if (config.parse() < 0)
     {
@@ -39,9 +41,12 @@ int InvertTypes::init(const char *path, const char *file)
         WARNING("invalid invert_num[%d], should in [0, 255)", invert_num);
         return -1;
     }
+    oss << "invert_num: " << invert_num << std::endl;
     char buffer[256];
     for (int i = 0; i < invert_num; ++i)
     {
+        oss << std::endl;
+
         int type;
         ::snprintf(buffer, sizeof buffer, "invert_%d_type", i);
         if (!config.get(buffer, type))
@@ -49,6 +54,7 @@ int InvertTypes::init(const char *path, const char *file)
             WARNING("failed to get %s", buffer);
             goto FAIL;
         }
+        oss << buffer << ": " << type << std::endl;
         int length;
         ::snprintf(buffer, sizeof buffer, "invert_%d_payload_len", i);
         if (!config.get(buffer, length))
@@ -56,6 +62,7 @@ int InvertTypes::init(const char *path, const char *file)
             WARNING("failed to get %s", buffer);
             goto FAIL;
         }
+        oss << buffer << ": " << length << std::endl;
         std::string prefix;
         ::snprintf(buffer, sizeof buffer, "invert_%d_prefix", i);
         if (!config.get(buffer, prefix))
@@ -63,6 +70,7 @@ int InvertTypes::init(const char *path, const char *file)
             WARNING("failed to get %s", buffer);
             goto FAIL;
         }
+        oss << buffer << ": " << prefix << std::endl;
         std::string parser;
         ::snprintf(buffer, sizeof buffer, "invert_%d_parser", i);
         if (!config.get(buffer, parser))
@@ -70,6 +78,7 @@ int InvertTypes::init(const char *path, const char *file)
             WARNING("failed to get %s", buffer);
             goto FAIL;
         }
+        oss << buffer << ": " << parser << std::endl;
         WARNING("invert[%d]: type=%d, payload_len=%d, prefix=%s, parser=%s",
                 i, type, length, prefix.c_str(), parser.c_str());
         if (type < 0 || type >= 0xFF
@@ -92,6 +101,7 @@ int InvertTypes::init(const char *path, const char *file)
         ::snprintf(types[type].prefix, sizeof(types[type].prefix), "%s", prefix.c_str());
         types[type].parser = (*it->second)();
     }
+    m_meta = oss.str();
     return 0;
 FAIL:
     this->destroy();
