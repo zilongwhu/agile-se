@@ -126,7 +126,7 @@ fail1:
         WARNING("write %ssigndict.meta ok", path.c_str());
     }
     WARNING("dump signdict ok");
-    return false;
+    return true;
 }
 
 bool SignDict::load(const char *dir)
@@ -254,5 +254,5 @@ fail1:
         }
     }
     WARNING("read signdict ok");
-    return false;
+    return true;
 }
