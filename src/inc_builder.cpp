@@ -19,6 +19,7 @@
 
 int inc_build_index(inc_builder_t *args)
 {
+    DualDir &dir = *args->dump_dir;
     ForwardIndex &forward = *args->forward;
     InvertIndex &invert = *args->invert;
     IncReader &reader = *args->reader;
@@ -55,8 +56,18 @@ int inc_build_index(inc_builder_t *args)
             }
             if (last_dump_time + args->dump_interval < g_now_time)
             {
-                forward.dump(args->dump_path.c_str());
-                invert.dump(args->dump_path.c_str());
+                std::string path = dir.writeable_path();
+                WARNING("start to dump index to dir[%s]", path.c_str());
+                if (forward.dump(path.c_str())
+                        && invert.dump(path.c_str())
+                        && dir.switch_using() >= 0)
+                {
+                    WARNING("dump index to dir[%s] ok", path.c_str());
+                }
+                else
+                {
+                    WARNING("failed to dump index to dir[%s]", path.c_str());
+                }
                 last_dump_time = g_now_time;
             }
 
@@ -151,5 +162,6 @@ int inc_build_index(inc_builder_t *args)
             break;
         }
     }
+    delete [] log_buffer;
     return -1;
 }

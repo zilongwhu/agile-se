@@ -18,6 +18,7 @@
 #define __AGILE_SE_INC_BUILDER_H__
 
 #include "reader.h"
+#include "dual_dir.h"
 #include "forward_index.h"
 #include "invert_index.h"
 
@@ -25,7 +26,7 @@ struct inc_builder_t
 {
     uint32_t dump_interval;
     uint32_t print_meta_interval;
-    std::string dump_path;
+    DualDir *dump_dir;
 
     ForwardIndex *forward;
     InvertIndex *invert;
