@@ -39,7 +39,11 @@ class ForwardIndex
             int offset;
             int array_offset;
             int type; /* 0->int, 1->float, 2->google::protobuf::Message * */
-            const google::protobuf::Message *default_message;
+            union
+            {
+                double default_value;
+                const google::protobuf::Message *default_message;
+            };
         };
     private:
         typedef TDelayPool<VMemoryPool> Pool;
@@ -110,6 +114,7 @@ class ForwardIndex
         Hash *m_dict;
 
         __gnu_cxx::hash_map<std::string, FieldDes> m_fields;
+        std::vector<std::pair<uint32_t, double> > m_default_values;
         std::vector<const google::protobuf::Message *> m_default_messages;
         size_t m_info_size;
         std::string m_meta;

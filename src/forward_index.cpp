@@ -31,6 +31,7 @@ struct FieldConfig
     int type;
     int offset;
     int size;
+    double default_value;
 };
 
 void ForwardIndex::cleanup(Hash::node_t *node, intptr_t arg)
@@ -81,6 +82,8 @@ int ForwardIndex::init(const char *path, const char *file)
     std::vector<FieldConfig> fields;
     for (int i = 0; i < field_num; ++i)
     {
+        oss << std::endl;
+
         FieldConfig field;
         char buffer[256];
 
@@ -121,6 +124,7 @@ int ForwardIndex::init(const char *path, const char *file)
         }
         oss << buffer << ": " << type << std::endl;
 
+        field.default_value = 0;
         if (SELF_DEFINE_TYPE == field.type)
         {
             ::snprintf(buffer, sizeof(buffer), "field_%d_pb_name", i);
@@ -131,6 +135,15 @@ int ForwardIndex::init(const char *path, const char *file)
             }
             oss << buffer << ": " << field.pb_name << std::endl;
         }
+        else
+        {
+            ::snprintf(buffer, sizeof(buffer), "field_%d_default", i);
+            if (config.get(buffer, field.default_value))
+            {
+                oss << buffer << ": " << field.default_value << std::endl;
+            }
+        }
+
         ::snprintf(buffer, sizeof(buffer), "field_%d_offset", i);
         if (!config.get(buffer, field.offset))
         {
@@ -151,6 +164,7 @@ int ForwardIndex::init(const char *path, const char *file)
         }
     }
     WARNING("info_size = %d", max_size);
+    oss << std::endl;
     oss << "info_size: " << max_size << std::endl;
 
     std::vector<int> placeholder(max_size, -1);
@@ -221,7 +235,7 @@ int ForwardIndex::init(const char *path, const char *file)
         }
         else
         {
-            fd.default_message = NULL;
+            fd.default_value = fields[i].default_value;
         }
 
         m_fields.insert(std::make_pair(fields[i].name, fd));
@@ -278,12 +292,25 @@ int ForwardIndex::init(const char *path, const char *file)
                 m_cleanup_data.fields_need_free.push_back(it->second.array_offset);
                 m_default_messages[it->second.array_offset] = it->second.default_message;
             }
+            else if (it->second.default_value != 0)
+            {
+                if (INT_TYPE == it->second.type)
+                {
+                    m_default_values.push_back(std::make_pair(((it->second.array_offset << 2)), it->second.default_value));
+                }
+                else
+                {
+                    m_default_values.push_back(std::make_pair(((it->second.array_offset << 2) | 0x1), it->second.default_value));
+                }
+            }
             ++it;
         }
         std::sort(m_cleanup_data.fields_need_free.begin(), m_cleanup_data.fields_need_free.end());
+        std::sort(m_default_values.begin(), m_default_values.end());
     }
     m_meta = oss.str();
     WARNING("max_items_num[%d], bucket_size[%d]", max_items_num, bucket_size);
+    WARNING("meta:\n%s", m_meta.c_str());
     return 0;
 }
 
@@ -360,6 +387,18 @@ bool ForwardIndex::update(int32_t id, const std::vector<std::pair<std::string, c
     else
     {
         ::memset(mem, 0, m_info_size);
+        for (size_t i = 0; i < m_default_values.size(); ++i)
+        {
+            uint32_t f = m_default_values[i].first;
+            if (f & 0x1)
+            {
+                ((float *)mem)[f >> 2] = m_default_values[i].second;
+            }
+            else
+            {
+                ((int *)mem)[f >> 2] = int(m_default_values[i].second);
+            }
+        }
     }
     cleanup_data_t cd;
     cd.mem = NULL;
@@ -777,6 +816,22 @@ bool ForwardIndex::load(const char *dir)
             }
             ((Message **)mem)[self_defines[n]] = message;
             len += tmp_len;
+        }
+        for (size_t k = 0; k < m_default_values.size(); ++k)
+        {
+            uint32_t f = m_default_values[k].first;
+            if (int(f & ~0x3) < info_size)
+            {
+                continue;
+            }
+            if (f & 0x1)
+            {
+                ((float *)mem)[f >> 2] = m_default_values[k].second;
+            }
+            else
+            {
+                ((int *)mem)[f >> 2] = int(m_default_values[k].second);
+            }
         }
         if (len != length)
         {
