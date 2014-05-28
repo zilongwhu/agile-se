@@ -360,6 +360,9 @@ int main(int argc, char *argv[])
     args.forward = &forward;
     args.invert = &invert;
     args.reader = &reader;
+    args.dump_interval = 3600;
+    args.print_meta_interval = 600;
+    args.dump_path = "./data";
 
     inc_build_index(&args);
 

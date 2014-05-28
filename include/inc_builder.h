@@ -23,6 +23,10 @@
 
 struct inc_builder_t
 {
+    uint32_t dump_interval;
+    uint32_t print_meta_interval;
+    std::string dump_path;
+
     ForwardIndex *forward;
     InvertIndex *invert;
     IncReader *reader;
