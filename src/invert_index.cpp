@@ -1753,7 +1753,10 @@ FAIL3:
         WARNING("write docid=>signs ok");
     }
     bool ret = this->m_sign2id.dump(dir);
-    WARNING("write dir[%s] ok", dir);
+    if (ret)
+    {
+        WARNING("write dir[%s] ok", dir);
+    }
     return ret;
 }
 
