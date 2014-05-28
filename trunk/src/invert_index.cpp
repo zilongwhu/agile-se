@@ -378,10 +378,10 @@ InvertIndex::~InvertIndex()
         delete m_del_dict;
         m_del_dict = NULL;
     }
-    if (m_docid2signs)
+    if (m_words_bag)
     {
-        delete m_docid2signs;
-        m_docid2signs = NULL;
+        delete m_words_bag;
+        m_words_bag = NULL;
     }
 }
 
@@ -540,20 +540,20 @@ int InvertIndex::init(const char *path, const char *file)
     }
     m_del_dict->set_pool(&m_vnode_pool);
     m_del_dict->set_cleanup(cleanup_diff_node, (intptr_t)this);
-    int docid2signs_hash_size;
-    if (!config.get("docid2signs_hash_size", docid2signs_hash_size) || docid2signs_hash_size <= 0)
+    int words_bag_hash_size;
+    if (!config.get("words_bag_hash_size", words_bag_hash_size) || words_bag_hash_size <= 0)
     {
-        WARNING("failed to get docid2signs_hash_size");
+        WARNING("failed to get words_bag_hash_size");
         return -1;
     }
-    m_docid2signs = new VHash(docid2signs_hash_size);
-    if (NULL == m_docid2signs)
+    m_words_bag = new VHash(words_bag_hash_size);
+    if (NULL == m_words_bag)
     {
-        WARNING("failed to new m_docid2signs");
+        WARNING("failed to new m_words_bag");
         return -1;
     }
-    m_docid2signs->set_pool(&m_vnode_pool);
-    m_docid2signs->set_cleanup(cleanup_id_node, (intptr_t)this);
+    m_words_bag->set_pool(&m_vnode_pool);
+    m_words_bag->set_cleanup(cleanup_id_node, (intptr_t)this);
 
     m_types.set_sign_dict(&m_sign2id);
 
@@ -564,7 +564,7 @@ int InvertIndex::init(const char *path, const char *file)
     WARNING("dict_hash_size=%u", dict_hash_size);
     WARNING("add_dict_hash_size=%u", add_dict_hash_size);
     WARNING("del_dict_hash_size=%u", del_dict_hash_size);
-    WARNING("docid2signs_hash_size=%u", docid2signs_hash_size);
+    WARNING("words_bag_hash_size=%u", words_bag_hash_size);
     WARNING("init ok");
     return 0;
 }
@@ -667,7 +667,7 @@ bool InvertIndex::get_signs_by_docid(int32_t docid, std::vector<uint32_t> &signs
 {
     signs.clear();
 
-    vaddr_t *vlist = m_docid2signs->find(docid);
+    vaddr_t *vlist = m_words_bag->find(docid);
     if (NULL == vlist)
     {
         return false;
@@ -783,7 +783,7 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, void *
         }
     }
     IDList *idlist = NULL;
-    vaddr_t *vidlist = m_docid2signs->find(docid);
+    vaddr_t *vidlist = m_words_bag->find(docid);
     if (vidlist)
     {
         idlist = m_idlist_pool.addr(*vidlist);
@@ -805,7 +805,7 @@ bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, void *
             WARNING("failed to alloc IDList");
             return false;
         }
-        if (!tmp->insert(sign) || !m_docid2signs->insert(docid, vlist))
+        if (!tmp->insert(sign) || !m_words_bag->insert(docid, vlist))
         {
             m_idlist_pool.free(vlist);
             WARNING("failed to insert sign[%u] of hash value[%s:%d] for docid[%d]", sign, keystr, int(type), docid);
@@ -862,14 +862,14 @@ bool InvertIndex::remove(const char *keystr, uint8_t type, int32_t docid)
             m_add_dict->remove(sign);
         }
     }
-    vaddr_t *vidlist = m_docid2signs->find(docid);
+    vaddr_t *vidlist = m_words_bag->find(docid);
     if (vidlist)
     {
         IDList *idlist = m_idlist_pool.addr(*vidlist);
         idlist->remove(sign);
         if (idlist->size() == 0)
         {
-            m_docid2signs->remove(docid);
+            m_words_bag->remove(docid);
         }
     }
     return true;
@@ -877,7 +877,7 @@ bool InvertIndex::remove(const char *keystr, uint8_t type, int32_t docid)
 
 bool InvertIndex::remove(int32_t docid)
 {
-    vaddr_t *vidlist = m_docid2signs->find(docid);
+    vaddr_t *vidlist = m_words_bag->find(docid);
     if (NULL == vidlist)
     {
         return true;
@@ -930,7 +930,7 @@ bool InvertIndex::remove(int32_t docid)
         }
         ++it;
     }
-    m_docid2signs->remove(docid);
+    m_words_bag->remove(docid);
     return true;
 }
 
@@ -1279,15 +1279,15 @@ void InvertIndex::print_meta() const
         WARNING("    total_count=%lu", (uint64_t)total_count);
     }
 
-    WARNING("m_docid2signs:");
-    WARNING("    size=%lu", (uint64_t)m_docid2signs->size());
-    WARNING("    mem=%lu", (uint64_t)m_docid2signs->mem_used());
+    WARNING("m_words_bag:");
+    WARNING("    size=%lu", (uint64_t)m_words_bag->size());
+    WARNING("    mem=%lu", (uint64_t)m_words_bag->mem_used());
     {
         size_t total_mem = 0;
         size_t total_count = 0;
 
         IDList *list;
-        VHash::iterator it = m_docid2signs->begin();
+        VHash::iterator it = m_words_bag->begin();
         while (it)
         {
             list = m_idlist_pool.addr(it.value());
@@ -1435,6 +1435,16 @@ bool InvertIndex::dump(const char *dir)
     if ('/' != path[path.length() - 1])
     {
         path += "/";
+    }
+    {
+        FILE *meta = ::fopen((path + "invert.meta").c_str(), "w");
+        if (NULL == meta)
+        {
+            WARNING("failed to open file[%sinvert.meta] for write", path.c_str());
+            return false;
+        }
+        ::fprintf(meta, "%s", m_types.m_meta.c_str());
+        ::fclose(meta);
     }
     this->mergeAll(m_merge_all_threshold);
     {
@@ -1674,22 +1684,22 @@ FAIL2:
         WARNING("write del invert index ok");
     }
     {
-        FILE *idx = ::fopen((path + "docid2signs.idx").c_str(), "wb");
+        FILE *idx = ::fopen((path + "words_bag.idx").c_str(), "wb");
         if (NULL == idx)
         {
-            WARNING("failed to open file[%sdocid2signs.idx] for write", path.c_str());
+            WARNING("failed to open file[%swords_bag.idx] for write", path.c_str());
             return false;
         }
-        FILE *data = ::fopen((path + "docid2signs.data").c_str(), "wb");
+        FILE *data = ::fopen((path + "words_bag.data").c_str(), "wb");
         if (NULL == data)
         {
             ::fclose(idx);
 
-            WARNING("failed to open file[%sdocid2signs.data] for write", path.c_str());
+            WARNING("failed to open file[%swords_bag.data] for write", path.c_str());
             return false;
         }
         size_t offset = 0;
-        VHash::iterator it = m_docid2signs->begin();
+        VHash::iterator it = m_words_bag->begin();
         while (it)
         {
             uint32_t length = 0;
@@ -2047,18 +2057,18 @@ FAIL2:
         WARNING("read del invert index ok");
     }
     {
-        FILE *idx = ::fopen((path + "docid2signs.idx").c_str(), "rb");
+        FILE *idx = ::fopen((path + "words_bag.idx").c_str(), "rb");
         if (NULL == idx)
         {
-            WARNING("failed to open file[%sdocid2signs.idx] for read", path.c_str());
+            WARNING("failed to open file[%swords_bag.idx] for read", path.c_str());
             return false;
         }
-        FILE *data = ::fopen((path + "docid2signs.data").c_str(), "rb");
+        FILE *data = ::fopen((path + "words_bag.data").c_str(), "rb");
         if (NULL == data)
         {
             ::fclose(idx);
 
-            WARNING("failed to open file[%sdocid2signs.data] for read", path.c_str());
+            WARNING("failed to open file[%swords_bag.data] for read", path.c_str());
             return false;
         }
         size_t offset = 0;
@@ -2093,7 +2103,7 @@ FAIL2:
                 WARNING("failed to alloc idlist");
                 goto FAIL3;
             }
-            if (!m_docid2signs->insert(key, vlist))
+            if (!m_words_bag->insert(key, vlist))
             {
                 m_idlist_pool.free(vlist);
 

@@ -67,7 +67,7 @@ class InvertIndex
             m_dict = NULL;
             m_add_dict = NULL;
             m_del_dict = NULL;
-            m_docid2signs = NULL;
+            m_words_bag = NULL;
         }
         ~ InvertIndex();
 
@@ -88,7 +88,7 @@ class InvertIndex
         }
         size_t docs_num() const
         {
-            return this->m_docid2signs->size();
+            return this->m_words_bag->size();
         }
         void print_meta() const;
         void print_list_length();
@@ -121,7 +121,7 @@ class InvertIndex
         Hash *m_dict;
         VHash *m_add_dict;
         VHash *m_del_dict;
-        VHash *m_docid2signs;
+        VHash *m_words_bag;
 };
 
 #endif
