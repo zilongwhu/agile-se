@@ -303,10 +303,12 @@ int ForwardIndex::init(const char *path, const char *file)
                     m_default_values.push_back(std::make_pair(((it->second.array_offset << 2) | 0x1), it->second.default_value));
                 }
             }
+            m_field_names.push_back(std::make_pair(it->second.offset, it->first));
             ++it;
         }
         std::sort(m_cleanup_data.fields_need_free.begin(), m_cleanup_data.fields_need_free.end());
         std::sort(m_default_values.begin(), m_default_values.end());
+        std::sort(m_field_names.begin(), m_field_names.end());
     }
     m_meta = oss.str();
     WARNING("max_items_num[%d], bucket_size[%d]", max_items_num, bucket_size);
