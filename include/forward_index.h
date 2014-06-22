@@ -162,6 +162,8 @@ class ForwardIndex
             return FieldIterator(this, info);
         }
         iterator begin() const { return iterator(this); }
+
+        size_t doc_num() const { return m_dict->size(); }
     private:
         struct cleanup_data_t
         {

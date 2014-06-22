@@ -1387,8 +1387,14 @@ void InvertIndex::mergeAll(uint32_t length)
 
     timer.start();
     size_t len = 0;
+    uint32_t last_recycle_time = g_now_time;
     for (size_t i = 0; i < signs.size(); ++i)
     {
+        if (g_now_time != last_recycle_time)
+        {
+            this->recycle();
+            last_recycle_time = g_now_time;
+        }
         len += this->merge(signs[i]);
     }
     timer.stop();
