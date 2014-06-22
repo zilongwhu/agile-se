@@ -144,24 +144,12 @@ int ForwardIndex::init(const char *path, const char *file)
             }
         }
 
+        field.offset = ((max_size + field.size - 1) & (~(field.size - 1)));
         ::snprintf(buffer, sizeof(buffer), "field_%d_offset", i);
-        if (!config.get(buffer, field.offset))
-        {
-            WARNING("failed to get %s", buffer);
-            return -1;
-        }
-        if (field.offset < 0 || field.offset % field.size != 0)
-        {
-            WARNING("invalid %s[%d] of field[%s]", buffer, field.offset, field.name.c_str());
-            return -1;
-        }
         oss << buffer << ": " << field.offset << std::endl;
 
         fields.push_back(field);
-        if (max_size < field.offset + field.size)
-        {
-            max_size = field.offset + field.size;
-        }
+        max_size = field.offset + field.size;
     }
     WARNING("info_size = %d", max_size);
     oss << std::endl;
@@ -592,7 +580,7 @@ bool ForwardIndex::dump(const char *dir) const
         length = m_info_size;
         for (size_t i = 0; i < self_defines.size(); ++i)
         {
-            message = ((Message **)mem)[self_defines[i]];
+            message = ((Message **)buffer)[self_defines[i]];
             if (message)
             {
                 if (!message->SerializeToArray(buffer + length, buffer_size - length))
@@ -601,7 +589,7 @@ bool ForwardIndex::dump(const char *dir) const
                     goto FAIL;
                 }
                 uint32_t len = message->ByteSize();
-                ((Message **)mem)[self_defines[i]] = (Message *)(intptr_t)len;
+                ((Message **)buffer)[self_defines[i]] = (Message *)(intptr_t)len;
                 length += len;
             }
         }

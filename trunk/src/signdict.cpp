@@ -219,7 +219,7 @@ fail0:
             WARNING("failed to read buffer_pos from %ssigndict.data", path.c_str());
             goto fail1;
         }
-        if (::fwrite(&buffer_size, sizeof(buffer_size), 1, data) != 1)
+        if (::fread(&buffer_size, sizeof(buffer_size), 1, data) != 1)
         {
             WARNING("failed to read buffer_size from %ssigndict.data", path.c_str());
             goto fail1;
@@ -230,11 +230,11 @@ fail0:
             WARNING("failed to alloc mem for buffer, buffer_size=%u", buffer_size);
             goto fail1;
         }
-        if (buffer_pos > 0 && ::fwrite(buffer, 1, buffer_pos, data) != buffer_pos)
+        if (buffer_pos > 0 && ::fread(buffer, 1, buffer_pos, data) != buffer_pos)
         {
             delete [] buffer;
 
-            WARNING("failed to write m_buffer to %ssigndict.data", path.c_str());
+            WARNING("failed to read m_buffer to %ssigndict.data", path.c_str());
             goto fail1;
         }
         ::fclose(data);
@@ -253,6 +253,7 @@ fail1:
             return false;
         }
     }
+    m_max_id = m_ids.size() + 1;
     WARNING("read signdict ok");
     return true;
 }

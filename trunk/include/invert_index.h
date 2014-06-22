@@ -95,6 +95,8 @@ class InvertIndex
 
         bool load(const char *dir);
         bool dump(const char *dir);
+
+        size_t doc_num() const { return m_words_bag->size(); }
     private:
         DocList *trigger(uint32_t sign) const;
         bool insert(const char *keystr, uint8_t type, int32_t docid, void *payload);
