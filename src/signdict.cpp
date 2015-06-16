@@ -15,6 +15,7 @@
 // =====================================================================================
 
 #include <new>
+#include <stdio.h>
 #include "signdict.h"
 
 bool SignDict::dump(const char *dir) const
@@ -214,6 +215,7 @@ fail0:
         }
         uint32_t buffer_pos;
         uint32_t buffer_size;
+        char *buffer = NULL;
         if (::fread(&buffer_pos, sizeof(buffer_pos), 1, data) != 1)
         {
             WARNING("failed to read buffer_pos from %ssigndict.data", path.c_str());
@@ -224,7 +226,7 @@ fail0:
             WARNING("failed to read buffer_size from %ssigndict.data", path.c_str());
             goto fail1;
         }
-        char *buffer = new (std::nothrow) char[buffer_size];
+        buffer = new (std::nothrow) char[buffer_size];
         if (NULL == buffer)
         {
             WARNING("failed to alloc mem for buffer, buffer_size=%u", buffer_size);

@@ -38,7 +38,7 @@ class InvertIndex
             uint8_t type;
             std::string word;
         };
-    private:
+    public:
         typedef TDelayPool<VMemoryPool> Pool;
         typedef Pool::vaddr_t vaddr_t;
 

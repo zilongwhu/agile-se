@@ -17,6 +17,7 @@
 #ifndef __AGILE_SE_INVERT_TYPE_H__
 #define __AGILE_SE_INVERT_TYPE_H__
 
+#include <stdio.h>
 #include <openssl/md5.h>
 #include "invert_parser.h"
 #include "signdict.h"

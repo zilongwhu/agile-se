@@ -18,8 +18,9 @@
 #define __AGILE_SE_HASH_TABLE_H__
 
 #include <string>
+#include <string.h>
 #include <functional>
-#include <ext/hash_fun.h>
+#include <ext/hash_map>
 #include "mempool2.h"
 #include "objectpool.h"
 

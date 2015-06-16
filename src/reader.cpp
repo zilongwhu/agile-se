@@ -14,7 +14,9 @@
 //
 // =====================================================================================
 
+#include <unistd.h>
 #include <errno.h>
+#include <string.h>
 #include <fstream>
 #include "log.h"
 #include "reader.h"
@@ -160,7 +162,7 @@ int IncReader::init(const char *path, const char *meta)
         _fp = NULL;
     }
     ::snprintf(_filepath, sizeof(_filepath) - sizeof(".xxxxxxxxxx"), "%s", fp.c_str());
-    _path_len = strlen(_filepath);
+    _path_len = ::strlen(_filepath);
 
     ::sprintf(_filepath + _path_len, ".%d", _file_no);
     _fp = ::fopen(_filepath, "r");

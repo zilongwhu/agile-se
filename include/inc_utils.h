@@ -17,7 +17,7 @@
 #ifndef __AGILE_SE_INC_UTILS_H__
 #define __AGILE_SE_INC_UTILS_H__
 
-#include <stddef.h>
+#include <stdint.h>
 #include <string>
 #include <vector>
 

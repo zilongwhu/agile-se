@@ -23,6 +23,7 @@ int parse_forward_json(const std::string &json, std::vector<std::pair<std::strin
     kvs.clear();
 
     cJSON *cjson = cJSON_Parse(json.c_str());
+    cJSON *fields = NULL;
     if (NULL == cjson)
     {
         WARNING("failed to parse json[%s]", json.c_str());
@@ -33,7 +34,7 @@ int parse_forward_json(const std::string &json, std::vector<std::pair<std::strin
         WARNING("invalid json, must be an object, [%s]", json.c_str());
         goto FAIL;
     }
-    cJSON *fields = cJSON_GetObjectItem(cjson, "fields");
+    fields = cJSON_GetObjectItem(cjson, "fields");
     if (NULL == fields)
     {
         WARNING("invalid json, must have fields array, [%s]", json.c_str());
@@ -93,6 +94,7 @@ int parse_invert_json(const std::string &json, std::vector<invert_data_t> &kvs)
     kvs.clear();
 
     cJSON *cjson = cJSON_Parse(json.c_str());
+    cJSON *inverts = NULL;
     if (NULL == cjson)
     {
         WARNING("failed to parse json[%s]", json.c_str());
@@ -103,7 +105,7 @@ int parse_invert_json(const std::string &json, std::vector<invert_data_t> &kvs)
         WARNING("invalid json, must be an object, [%s]", json.c_str());
         goto FAIL;
     }
-    cJSON *inverts = cJSON_GetObjectItem(cjson, "inverts");
+    inverts = cJSON_GetObjectItem(cjson, "inverts");
     if (NULL == inverts)
     {
         WARNING("invalid json, must have inverts array, [%s]", json.c_str());

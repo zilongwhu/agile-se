@@ -1805,6 +1805,8 @@ bool InvertIndex::load(const char *dir)
         uint32_t length;
         while (1)
         {
+            void *mem = NULL;
+            bl_head_t *pl = NULL;
             if (::fread(&key, sizeof(key), 1, idx) != 1)
             {
                 break;
@@ -1829,8 +1831,8 @@ bool InvertIndex::load(const char *dir)
                 WARNING("invalid length");
                 goto FAIL0;
             }
-            void *mem = ::malloc(length);
-            bl_head_t *pl = (bl_head_t *)mem;
+            mem = ::malloc(length);
+            pl = (bl_head_t *)mem;
             if (NULL == mem)
             {
                 WARNING("failed to alloc mem, length=%u", length);
@@ -1892,6 +1894,8 @@ FAIL0:
         char *payload;
         while (1)
         {
+            vaddr_t vlist = 0;
+            SkipList *list = NULL;
             if (::fread(&key, sizeof(key), 1, idx) != 1)
             {
                 break;
@@ -1931,8 +1935,8 @@ FAIL0:
                     goto FAIL1;
                 }
             }
-            vaddr_t vlist = m_skiplist_pool.alloc(&m_pool, type, payload_len);
-            SkipList *list = m_skiplist_pool.addr(vlist);
+            vlist = m_skiplist_pool.alloc(&m_pool, type, payload_len);
+            list = m_skiplist_pool.addr(vlist);
             if (NULL == list)
             {
                 WARNING("failed to alloc skiplist");
@@ -2006,6 +2010,8 @@ FAIL1:
         int32_t docid;
         while (1)
         {
+            vaddr_t vlist = 0;
+            SkipList *list = NULL;
             if (::fread(&key, sizeof(key), 1, idx) != 1)
             {
                 break;
@@ -2025,8 +2031,8 @@ FAIL1:
                 WARNING("offset check error");
                 goto FAIL2;
             }
-            vaddr_t vlist = m_skiplist_pool.alloc(&m_pool, 0xFF, 0);
-            SkipList *list = m_skiplist_pool.addr(vlist);
+            vlist = m_skiplist_pool.alloc(&m_pool, 0xFF, 0);
+            list = m_skiplist_pool.addr(vlist);
             if (NULL == list)
             {
                 WARNING("failed to alloc skiplist");
@@ -2086,6 +2092,8 @@ FAIL2:
         uint32_t sign;
         while (1)
         {
+            vaddr_t vlist = 0;
+            IDList *list = 0;
             if (::fread(&key, sizeof(key), 1, idx) != 1)
             {
                 break;
@@ -2105,8 +2113,8 @@ FAIL2:
                 WARNING("offset check error");
                 goto FAIL3;
             }
-            vaddr_t vlist = m_idlist_pool.alloc(&m_inode_pool);
-            IDList *list = m_idlist_pool.addr(vlist);
+            vlist = m_idlist_pool.alloc(&m_inode_pool);
+            list = m_idlist_pool.addr(vlist);
             if (NULL == list)
             {
                 WARNING("failed to alloc idlist");
