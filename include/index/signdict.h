@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 #include "index/hashtable.h"
-#include "utils/fsint.h"
+#include "fsint.h"
 
 class SignDict
 {

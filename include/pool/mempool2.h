@@ -6,7 +6,7 @@
 #include <new>
 #include <vector>
 #include <ext/hash_map>
-#include "utils/log.h"
+#include "log_utils.h"
 
 namespace mem_detail
 {

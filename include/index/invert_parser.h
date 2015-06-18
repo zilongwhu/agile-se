@@ -3,7 +3,7 @@
 
 #include <map>
 #include <string>
-#include "utils/cJSON.h"
+#include "cJSON.h"
 
 class InvertParser
 {

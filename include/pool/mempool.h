@@ -5,7 +5,7 @@
 #include <vector>
 #include <algorithm>
 #include <ext/hash_map>
-#include "utils/log.h"
+#include "log_utils.h"
 
 #ifndef AGILE_SE_MEM_PAGE_SIZE
 #define AGILE_SE_MEM_PAGE_SIZE   (1024*1024u)

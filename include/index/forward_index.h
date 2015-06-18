@@ -11,8 +11,8 @@
 #include "pool/objectpool.h"
 #include "index/hashtable.h"
 #include "index/idmap.h"
-#include "utils/cJSON.h"
-#include "utils/fsint.h"
+#include "cJSON.h"
+#include "fsint.h"
 #include <google/protobuf/message.h>
 
 class ForwardIndex

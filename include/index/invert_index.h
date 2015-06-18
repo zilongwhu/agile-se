@@ -23,9 +23,9 @@
 #include "index/invert_type.h"
 #include "index/signdict.h"
 #include "search/doclist.h"
-#include "utils/file_watcher.h"
-#include "utils/cJSON.h"
-#include "utils/fsint.h"
+#include "file_watcher.h"
+#include "cJSON.h"
+#include "fsint.h"
 
 #ifndef __NOT_USE_COWBTREE__
 #include "index/cow_btree.h"

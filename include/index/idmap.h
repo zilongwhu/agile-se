@@ -4,7 +4,7 @@
 #include <map>
 #include <string>
 #include <stdint.h>
-#include "utils/fsint.h"
+#include "fsint.h"
 
 class IDMapper
 {

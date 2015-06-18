@@ -6,8 +6,8 @@
 #include <errno.h>
 #include <string>
 #include <vector>
-#include "utils/log.h"
-#include "utils/cJSON.h"
+#include "cJSON.h"
+#include "log_utils.h"
 #include "index/index.h"
 
 namespace inc

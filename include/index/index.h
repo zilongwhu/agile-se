@@ -5,8 +5,8 @@
 #include	<string>
 #include	"index/invert_index.h"
 #include	"index/forward_index.h"
-#include	"utils/dual_dir.h"
-#include	"utils/file_watcher.h"
+#include	"dual_dir.h"
+#include	"file_watcher.h"
 #include	"inc/inc_reader.h"
 
 void init_nbslib();
