@@ -39,7 +39,7 @@ class Disjunction: public DocList
                 int32_t docid = m_subs[i]->first();
                 if (-1 != docid)
                 {
-                    pos_t pos = { docid, i };
+                    pos_t pos = { docid, int(i) };
                     m_heap.push_back(pos);
                 }
             }

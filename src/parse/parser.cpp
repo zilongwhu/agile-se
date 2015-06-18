@@ -2,7 +2,7 @@
 #include <string.h>
 #include <stack>
 #include "parse/parser.h"
-#include "utils/log.h"
+#include "log_utils.h"
 
 static int8_t g_operator_priority[256];
 

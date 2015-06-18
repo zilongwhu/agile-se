@@ -2,6 +2,7 @@
 #define __AGILE_SE_HASH_TABLE_H__
 
 #include <string>
+#include <string.h>
 #include <functional>
 #include <ext/hash_map> /* <ext/hash_fun.h> is deprecated */
 #include "pool/mempool.h"

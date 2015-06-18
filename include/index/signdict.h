@@ -132,10 +132,7 @@ class SignDict
         bool find_or_insert(uint64_t sign, const char *word, uint32_t len, uint32_t &id) /* not thread safe */
         {
 #ifndef P_LOG_WORD
-#define P_LOG_WORD( _fmt_, args... ) \
-	do{\
-		com_writelog( "TERM_SIGN", "[%s][%s][%d] " _fmt_, __FILE__, __FUNCTION__, __LINE__, ##args );\
-	}while(0)
+#define P_LOG_WORD( _fmt_, args... )
 #endif
             if (NULL == word || 0 == len)
             {

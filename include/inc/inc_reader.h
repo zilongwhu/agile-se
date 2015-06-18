@@ -1,10 +1,10 @@
 #ifndef __AGILE_SE_INC_READER_H__
 #define __AGILE_SE_INC_READER_H__
 
-#include	<stdio.h>
-#include	<stdint.h>
-#include	<string>
-#include	<vector>
+#include <stdio.h>
+#include <stdint.h>
+#include <string>
+#include <vector>
 
 #ifndef P_MYLOG
 #define P_MYLOG( _fmt_, args... ) \
@@ -12,6 +12,10 @@
 	    ::snprintf( log_buffer, log_buffer_length, "[%s][%s][%d] " _fmt_, __FILE__, __FUNCTION__, __LINE__, ##args );\
         reader.log(log_buffer);\
 	}while(0)
+#endif
+
+#ifndef PATH_MAX
+#define PATH_MAX (1024)
 #endif
 
 namespace inc
@@ -70,7 +74,7 @@ namespace inc
             uint32_t _partition_cur;
             uint32_t _partition_num;
             uint32_t _base_mode;
-            bsl::string _inc_name;
+            std::string _inc_name;
     
             FILE *_fp;
 

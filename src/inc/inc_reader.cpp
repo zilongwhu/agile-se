@@ -1,10 +1,12 @@
-#include	<errno.h>
-#include	<fstream>
-#include	"inc/inc_utils.h"
-#include	"inc/inc_reader.h"
-#include	"utils/log.h"
-#include	"utils/fast_timer.h"
-#include	"configure.h"
+#include <errno.h>
+#include <unistd.h>
+#include <string.h>
+#include <fstream>
+#include "inc/inc_reader.h"
+#include "log_utils.h"
+#include "str_utils.h"
+#include "fast_timer.h"
+#include "configure.h"
 
 namespace inc
 {
@@ -40,7 +42,7 @@ namespace inc
                 return -1;
             }
         }
-        WARING_CATCH_EXEC(return -1, "failed to load conf from [%s] [%s]", path, meta);
+        WARNING_CATCH_EXC(return -1, "failed to load conf from [%s] [%s]", path, meta);
         if (_fp)
         {
             ::fclose(_fp);

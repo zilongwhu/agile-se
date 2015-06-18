@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include "search/biglist.h"
 #include "search/arraylist.h"
-#include "utils/log.h"
+#include "log_utils.h"
 
 ArrayList::ArrayList(int8_t type, const std::vector<int32_t> &docids)
 {

@@ -1,8 +1,12 @@
-#include <stddef.h>
-#include "inc/inc_utils.h"
+#ifndef __STDC_LIMIT_MACROS
+#define __STDC_LIMIT_MACROS
+#endif
+
+#include <stdint.h>
 #include "inc/inc_builder.h"
-#include "utils/file_watcher.h"
-#include "utils/meminfo.h"
+#include "str_utils.h"
+#include "file_watcher.h"
+#include "meminfo.h"
 
 namespace inc
 {
@@ -57,7 +61,7 @@ namespace inc
             goto FAIL;
         }
         values.clear();
-        for (cJSON *c = object->child; c; c = c->next)
+        for (cJSON *c = cjson->child; c; c = c->next)
         {
             int type = -1;
             if (!parseInt32(c->string, type) || type >= UINT8_MAX || type < 0)
@@ -73,7 +77,7 @@ namespace inc
             }
             for (cJSON *cc = c->child; cc; cc = cc->next)
             {
-                if (!data.build(type, value))
+                if (!data.build(type, cc))
                 {
                     goto FAIL;
                 }
@@ -177,6 +181,7 @@ FAIL:
                 fields.clear();
                 inverts.clear();
                 ForwardIndex::internal_ids_t ids;
+                /*
                 switch (level)
                 {
                     case FORWARD_LEVEL:
@@ -203,7 +208,7 @@ FAIL:
                         if (OP_DELETE == optype)
                         {
                             int32_t old_id = -1;
-                            if (idx.forward_remove(oid, &old_id)) /* remove & get old internal id */
+                            if (idx.forward_remove(oid, &old_id))
                             {
                                 idx.invert_remove(old_id);
                             }
@@ -237,6 +242,7 @@ FAIL:
                         }
                         break;
                 };
+                */
             } else if (ret < 0) {
                 P_FATAL("disk file error");
                 break;
