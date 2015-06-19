@@ -164,7 +164,7 @@ bool default_base_builder(base_build_t &args)
                     args.invert->remove(oid);
                     for (size_t i = 0; i < inverts.size(); ++i)
                     {
-                        args.invert->insert(inverts[i].key, inverts[i].type, oid, inverts[i].value);
+                        args.invert->insert(oid, inverts[i]);
                     }
                     P_TRACE("update ok, level=%d, oid=%d", level, oid);
                 }

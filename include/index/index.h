@@ -136,36 +136,34 @@ class Index
             return this->m_forward.get_field_iterator(info);
         }
     public: /* 更新接口 */
-        /* 正排更新 */
-        bool forward_update(int32_t docid, const std::vector<forward_data_t> &fields,
-                ForwardIndex::ids_t *p_ids = NULL)
+        bool forward_update(int32_t docid, const std::vector<forward_data_t> &fields)
         {
-            return m_forward.update(docid, fields, p_ids);
+            ForwardIndex::ids_t ids;
+            return m_forward.update(docid, fields, &ids)
+                && m_invert.update_docid(ids.old_id, ids.new_id);
         }
-        bool forward_remove(int32_t docid, int32_t *p_id = NULL)
+        bool update(int32_t docid, const std::vector<forward_data_t> &fields,
+                const std::vector<invert_data_t> &inverts)
         {
-            return m_forward.remove(docid, p_id);
+            ForwardIndex::ids_t ids;
+            if (!m_forward.update(docid, fields, &ids))
+            {
+                return false;
+            }
+            if (!m_invert.remove(ids.old_id))
+            {
+                return false;
+            }
+            for (size_t i = 0; i < inverts.size(); ++i)
+            {
+                m_invert.insert(ids.new_id, inverts[i]);
+            }
+            return true;
         }
-        /* 倒排更新 */
-        bool invert_insert(const char *keystr, uint8_t type, int32_t docid, const std::string &json)
+        bool remove(int32_t docid)
         {
-            return m_invert.insert(keystr, type, docid, json);
-        }
-        bool invert_insert(const char *keystr, uint8_t type, int32_t docid, cJSON *json)
-        {
-            return m_invert.insert(keystr, type, docid, json);
-        }
-        bool invert_remove(const char *keystr, int8_t type, int32_t docid)
-        {
-            return m_invert.remove(keystr, type, docid);
-        }
-        bool invert_remove(int32_t docid)
-        {
-            return m_invert.remove(docid);
-        }
-        bool update_docid(int32_t from, int32_t to)
-        {
-            return m_invert.update_docid(from, to);
+            int32_t id = 0;
+            return m_forward.remove(docid, &id) && m_invert.remove(id);
         }
     public:
         int32_t inc_das_warning_time() const
