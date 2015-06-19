@@ -180,7 +180,7 @@ FAIL:
                 }
                 fields.clear();
                 inverts.clear();
-                ForwardIndex::internal_ids_t ids;
+                ForwardIndex::ids_t ids;
                 /*
                 switch (level)
                 {

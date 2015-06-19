@@ -21,13 +21,20 @@ class TObjectPool
             Pool *pool;
         };
     public:
-        static int init_pool(Pool *pool)
+        TObjectPool()
         {
-            return pool->register_item(sizeof(cleanup_bag_t));
+            m_pool = NULL;
+            m_shared = false;
         }
-    public:
-        TObjectPool() { m_pool = NULL; }
-        ~TObjectPool() { m_pool = NULL; }
+        ~TObjectPool()
+        {
+            if (!m_shared && m_pool)
+            {
+                delete m_pool;
+            }
+            m_pool = NULL;
+            m_shared = false;
+        }
 
         int init(Pool *pool)
         {
@@ -36,8 +43,7 @@ class TObjectPool
                 P_WARNING("ignore duplicate init call");
                 return -1;
             }
-            m_pool = pool;
-            if (NULL == m_pool)
+            if (NULL == pool)
             {
                 m_pool = new Pool;
                 if (NULL == m_pool)
@@ -45,7 +51,7 @@ class TObjectPool
                     P_WARNING("failed to new Pool");
                     return -1;
                 }
-                if (init_pool(m_pool) < 0)
+                if (pool->register_item(sizeof(cleanup_bag_t)) < 0)
                 {
                     P_WARNING("failed to register cleanup_bat_t");
                 }
@@ -66,6 +72,18 @@ class TObjectPool
                 m_pool = NULL;
                 return -1;
             }
+            if (pool->register_item(sizeof(cleanup_bag_t)) < 0)
+            {
+                P_WARNING("failed to register cleanup_bat_t");
+                return -1;
+            }
+            else if (m_pool->register_item(sizeof(T)) < 0)
+            {
+                P_WARNING("failed to register item");
+                return -1;
+            }
+            m_pool = pool;
+            m_shared = true;
             return 0;
         }
 
@@ -198,6 +216,7 @@ class TObjectPool
         }
     private:
         Pool *m_pool;
+        bool m_shared;
 };
 
 #endif

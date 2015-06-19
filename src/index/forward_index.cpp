@@ -118,9 +118,9 @@ int ForwardIndex::init(const char *path, const char *file)
                 field.type = FLOAT_TYPE;
                 field.size = sizeof(float);
             }
-            else if ("self_define" == type)
+            else if ("proto" == type)
             {
-                field.type = SELF_DEFINE_TYPE;
+                field.type = PROTO_TYPE;
                 field.size = sizeof(void *);
             }
             else if ("binary" == type)
@@ -135,7 +135,7 @@ int ForwardIndex::init(const char *path, const char *file)
             }
 
             field.default_value = 0;
-            if (SELF_DEFINE_TYPE == field.type)
+            if (PROTO_TYPE == field.type)
             {
                 ::snprintf(tmpbuf, sizeof tmpbuf, "field_%d_pb_name", i);
                 field.pb_name = conf[tmpbuf];
@@ -144,7 +144,6 @@ int ForwardIndex::init(const char *path, const char *file)
             else if (BINARY_TYPE != field.type)
             {
                 std::string ds;
-                field.default_value = 0;
                 ::snprintf(tmpbuf, sizeof tmpbuf, "field_%d_default", i);
                 if (conf.get(tmpbuf, ds) && !parseDouble(ds, field.default_value))
                 {
@@ -207,7 +206,7 @@ int ForwardIndex::init(const char *path, const char *file)
         {
             FieldDes fd;
 
-            if (m_fields.find(fields[i].name.c_str()) != m_fields.end())
+            if (m_fields.find(fields[i].name) != m_fields.end())
             {
                 P_WARNING("duplicate field name[%s]", fields[i].name.c_str());
                 return -1;
@@ -215,9 +214,9 @@ int ForwardIndex::init(const char *path, const char *file)
             fd.offset = fields[i].offset;
             fd.array_offset = fields[i].offset / fields[i].size;
             fd.type = fields[i].type;
-            if (SELF_DEFINE_TYPE == fd.type)
+            if (PROTO_TYPE == fd.type)
             {
-                const Descriptor *des = pl->FindMessageTypeByName(fields[i].pb_name.c_str());
+                const Descriptor *des = pl->FindMessageTypeByName(fields[i].pb_name);
                 if (NULL == des)
                 {
                     P_WARNING("failed to get google::protobuf::Descriptor of [%s]", fields[i].pb_name.c_str());
@@ -235,28 +234,23 @@ int ForwardIndex::init(const char *path, const char *file)
                 fd.default_value = fields[i].default_value;
             }
 
-            m_fields.insert(std::make_pair(std::string(fields[i].name.c_str()), fd));
+            m_fields.insert(std::make_pair(fields[i].name, fd));
         }
         m_info_size = max_size;
         m_default_messages.resize(m_info_size/sizeof(void *), NULL);
-        if (NodePool::init_pool(&m_pool) < 0)
+        if (m_node_pool.init(&m_pool) < 0)
         {
-            P_WARNING("failed to call init_pool");
+            P_WARNING("failed to init NodePool");
+            return -1;
+        }
+        if (m_id_pool.init(&m_pool) < 0)
+        {
+            P_WARNING("failed to init IDPool");
             return -1;
         }
         if (m_pool.register_item(m_info_size) < 0)
         {
             P_WARNING("failed to register info_size to mempool");
-            return -1;
-        }
-        if (m_pool.register_item(sizeof(NodePool::ObjectType)) < 0)
-        {
-            P_WARNING("failed to register NodePool::ObjectType to mempool");
-            return -1;
-        }
-        if (m_pool.register_item(sizeof(IDPool::ObjectType)) < 0)
-        {
-            P_WARNING("failed to register IDPool::ObjectType to mempool");
             return -1;
         }
         for (size_t i = 0; i < m_binary_size.size(); ++i)
@@ -267,26 +261,25 @@ int ForwardIndex::init(const char *path, const char *file)
                 return -1;
             }
         }
+        std::string mapper;
+        if (conf.get("id_mapper", mapper))
         {
-            std::string mapper;
-            if (conf.get("id_mapper", mapper))
+            std::map<std::string, IDMapper_creater>::const_iterator it = g_id_mappers.find(mapper);
+            if (it == g_id_mappers.end())
             {
-                std::map<std::string, IDMapper_creater>::const_iterator it = g_id_mappers.find(mapper);
-                if (it == g_id_mappers.end())
-                {
-                    P_WARNING("unregistered id mapper[%s]", mapper.c_str());
-                    return -1;
-                }
-                m_map = (*it->second)();
-                if (NULL == m_map)
-                {
-                    P_WARNING("failed to create id mapper[%s]", mapper.c_str());
-                    return -1;
-                }
-                P_WARNING("using id mapper[%s]", mapper.c_str());
+                P_WARNING("unregistered id mapper[%s]", mapper.c_str());
+                return -1;
             }
+            m_map = (*it->second)();
+            if (NULL == m_map)
+            {
+                P_WARNING("failed to create id mapper[%s]", mapper.c_str());
+                return -1;
+            }
+            P_WARNING("using id mapper[%s]", mapper.c_str());
         }
         uint32_t max_items_num;
+        uint32_t bucket_size;
         if (!parseUInt32(conf["max_items_num"], max_items_num))
         {
             P_WARNING("max_items_num must be uint32_t");
@@ -297,29 +290,24 @@ int ForwardIndex::init(const char *path, const char *file)
             P_WARNING("failed to init mempool");
             goto FAIL;
         }
-        uint32_t bucket_size;
         if (!parseUInt32(conf["bucket_size"], bucket_size))
         {
             P_WARNING("bucket_size must be uint32_t");
             goto FAIL;
         }
-
         m_idmap = new IDMap(bucket_size);
         if (NULL == m_idmap)
         {
             P_WARNING("failed to init id map");
             goto FAIL;
         }
-        m_id_pool.init(&m_pool);
         m_idmap->set_pool(&m_id_pool);
-
         m_dict = new Hash(bucket_size);
         if (NULL == m_dict)
         {
             P_WARNING("failed to init hash dict");
             goto FAIL;
         }
-        m_node_pool.init(&m_pool);
         m_dict->set_pool(&m_node_pool);
         m_dict->set_cleanup(cleanup, (intptr_t)this);
         {
@@ -330,7 +318,7 @@ int ForwardIndex::init(const char *path, const char *file)
                 {
                     m_cleanup_data.binary_fields.push_back(it->second.array_offset);
                 }
-                else if (SELF_DEFINE_TYPE == it->second.type)
+                else if (PROTO_TYPE == it->second.type)
                 {
                     m_cleanup_data.protobuf_fields.push_back(it->second.array_offset);
                     m_default_messages[it->second.array_offset] = it->second.default_message;
@@ -432,7 +420,7 @@ int32_t ForwardIndex::get_id_by_oid(int32_t oid) const
     return -1;
 }
 
-bool ForwardIndex::update(int32_t oid, cJSON *array, internal_ids_t *p_ids)
+bool ForwardIndex::update(int32_t oid, cJSON *array, ids_t *p_ids)
 {
     if (NULL == array)
     {
@@ -475,7 +463,7 @@ bool ForwardIndex::update(int32_t oid, cJSON *array, internal_ids_t *p_ids)
     return this->update(oid, tmp, p_ids);
 }
 
-bool ForwardIndex::update(int32_t oid, const std::vector<std::pair<std::string, std::string> > &kvs, internal_ids_t *p_ids)
+bool ForwardIndex::update(int32_t oid, const std::vector<std::pair<std::string, std::string> > &kvs, ids_t *p_ids)
 {
     std::vector<std::pair<std::string, cJSON *> > tmp;
     for (size_t i = 0; i < kvs.size(); ++i)
@@ -503,7 +491,7 @@ CLEAN:
     return ret;
 }
 
-bool ForwardIndex::update(int32_t oid, const std::vector<std::pair<std::string, cJSON *> > &kvs, internal_ids_t *p_ids)
+bool ForwardIndex::update(int32_t oid, const std::vector<std::pair<std::string, cJSON *> > &kvs, ids_t *p_ids)
 {
     vaddr_t vnew = m_pool.alloc(m_info_size);
     void *mem = m_pool.addr(vnew);
@@ -809,7 +797,7 @@ bool ForwardIndex::dump(const char *dir, FSInterface *fs) const
     Message *message = NULL;
     Hash::iterator it = m_dict->begin();
     const std::vector<int> &binaries = m_cleanup_data.binary_fields;
-    const std::vector<int> &self_defines = m_cleanup_data.protobuf_fields;
+    const std::vector<int> &protos = m_cleanup_data.protobuf_fields;
 
     size_t buffer_size = 1024*1024;
     char *buffer = new char[buffer_size];
@@ -846,9 +834,9 @@ bool ForwardIndex::dump(const char *dir, FSInterface *fs) const
         int32_t id = it.key();
         void *mem = m_pool.addr(it.value().addr);
         length = m_info_size;
-        for (size_t i = 0; i < self_defines.size(); ++i)
+        for (size_t i = 0; i < protos.size(); ++i)
         {
-            message = ((Message **)mem)[self_defines[i]];
+            message = ((Message **)mem)[protos[i]];
             if (message)
             {
                 length += message->ByteSize();
@@ -877,9 +865,9 @@ bool ForwardIndex::dump(const char *dir, FSInterface *fs) const
         }
         ::memcpy(buffer, mem, m_info_size);
         length = m_info_size;
-        for (size_t i = 0; i < self_defines.size(); ++i)
+        for (size_t i = 0; i < protos.size(); ++i)
         {
-            message = ((Message **)buffer)[self_defines[i]];
+            message = ((Message **)buffer)[protos[i]];
             if (message)
             {
                 if (!message->SerializeToArray(buffer + length, buffer_size - length))
@@ -888,7 +876,7 @@ bool ForwardIndex::dump(const char *dir, FSInterface *fs) const
                     goto FAIL;
                 }
                 uint32_t len = message->ByteSize();
-                ((Message **)buffer)[self_defines[i]] = (Message *)(intptr_t)len;
+                ((Message **)buffer)[protos[i]] = (Message *)(intptr_t)len;
                 length += len;
             }
         }
@@ -1020,7 +1008,7 @@ bool ForwardIndex::load(const char *dir, FSInterface *fs)
     size_t offset = 0;
     Message *message = NULL;
     const std::vector<int> &binaries = m_cleanup_data.binary_fields;
-    const std::vector<int> &self_defines = m_cleanup_data.protobuf_fields;
+    const std::vector<int> &protos = m_cleanup_data.protobuf_fields;
 
     size_t buffer_size = 1024*1024;
     buffer_size = buffer_size > info_size ? buffer_size : info_size;
@@ -1119,16 +1107,16 @@ bool ForwardIndex::load(const char *dir, FSInterface *fs)
         }
         uint32_t len = info_size;
         bool fail = false;
-        for (size_t n = 0; n < self_defines.size(); ++n)
+        for (size_t n = 0; n < protos.size(); ++n)
         {
-            if ((self_defines[n] + 1) * sizeof(void *) > info_size)
+            if ((protos[n] + 1) * sizeof(void *) > info_size)
             {
                 break;
             }
-            uint32_t tmp_len = (uint32_t)(intptr_t)((void **)mem)[self_defines[n]];
+            uint32_t tmp_len = (uint32_t)(intptr_t)((void **)mem)[protos[n]];
             if (tmp_len > 0)
             {
-                message = m_default_messages[self_defines[n]]->New();
+                message = m_default_messages[protos[n]]->New();
                 if (NULL == message)
                 {
                     P_WARNING("failed to create message");
@@ -1144,7 +1132,7 @@ bool ForwardIndex::load(const char *dir, FSInterface *fs)
             {
                 message = NULL;
             }
-            ((Message **)mem)[self_defines[n]] = message;
+            ((Message **)mem)[protos[n]] = message;
             len += tmp_len;
         }
         for (size_t n = 0; n < binaries.size(); ++n)

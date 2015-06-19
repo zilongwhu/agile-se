@@ -18,13 +18,13 @@
 class ForwardIndex
 {
     public:
-        enum { INT_TYPE = 0, FLOAT_TYPE, SELF_DEFINE_TYPE, BINARY_TYPE };
-        struct internal_ids_t
+        enum { INT_TYPE = 0, FLOAT_TYPE, PROTO_TYPE, BINARY_TYPE };
+        struct ids_t
         {
             int32_t old_id;
             int32_t new_id;
 
-            internal_ids_t() { old_id = new_id = -1; }
+            ids_t() { old_id = new_id = -1; }
         };
     private:
         typedef TDelayPool<Mempool> Pool;
@@ -93,7 +93,7 @@ class ForwardIndex
                             case BINARY_TYPE:
                                 value.bv = ((vaddr_t *)m_info)[it->second.array_offset];
                                 break;
-                            case SELF_DEFINE_TYPE:
+                            case PROTO_TYPE:
                                 value.pv = ((void **)m_info)[it->second.array_offset];
                                 break;
                         }
@@ -185,15 +185,15 @@ class ForwardIndex
             return m_pool.addr(add);
         }
 
-        bool update(int32_t oid, cJSON *array, internal_ids_t *p_ids = NULL);
-        bool update(int32_t oid, const std::string &key, const std::string &value, internal_ids_t *p_ids = NULL)
+        bool update(int32_t oid, cJSON *array, ids_t *p_ids = NULL);
+        bool update(int32_t oid, const std::string &key, const std::string &value, ids_t *p_ids = NULL)
         {
             std::vector<std::pair<std::string, std::string> > kvs;
             kvs.push_back(std::make_pair(key, value));
             return this->update(oid, kvs, p_ids);
         }
-        bool update(int32_t oid, const std::vector<std::pair<std::string, std::string> > &kvs, internal_ids_t *p_ids = NULL);
-        bool update(int32_t oid, const std::vector<std::pair<std::string, cJSON *> > &kvs, internal_ids_t *p_ids = NULL);
+        bool update(int32_t oid, const std::vector<std::pair<std::string, std::string> > &kvs, ids_t *p_ids = NULL);
+        bool update(int32_t oid, const std::vector<std::pair<std::string, cJSON *> > &kvs, ids_t *p_ids = NULL);
 
         bool remove(int32_t oid, int32_t *p_id = NULL);
 

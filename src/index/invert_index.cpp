@@ -81,28 +81,7 @@ int InvertIndex::init(const char *path, const char *file)
             return -1;
         }
     }
-#ifdef __NOT_USE_COWBTREE__
-    if (NodePool::init_pool(&m_pool) < 0)
-    {
-        P_WARNING("failed to call init_pool");
-        return -1;
-    }
-#else
-    if (BtreePool::init_pool(&m_pool) < 0)
-    {
-        P_WARNING("failed to call init_pool");
-        return -1;
-    }
-#endif
-    if (VNodePool::init_pool(&m_pool) < 0
-            || SNodePool::init_pool(&m_pool) < 0
-            || INodePool::init_pool(&m_pool) < 0
-            || SkipListPool::init_pool(&m_pool) < 0
-            || IDListPool::init_pool(&m_pool) < 0)
-    {
-        P_WARNING("failed to call init_pool");
-        return -1;
-    }
+    /* register items to pool */
     if (SkipList::init_pool(&m_pool, 0) < 0)
     {
         P_WARNING("failed to register item for deleted list");
@@ -133,51 +112,42 @@ int InvertIndex::init(const char *path, const char *file)
 #endif
         }
     }
-    if (!parseUInt32(conf["merge_threshold"], m_merge_threshold)
-            || !parseUInt32(conf["merge_all_threshold"], m_merge_all_threshold)
-            || !parseUInt32(conf["merge_speed"], m_merge_speed)
-            || !parseUInt32(conf["merge_sleep"], m_merge_sleep))
-    {
-        P_WARNING("failed to get uint32 value for merge_threshold,"
-                " merge_all_threshold, merge_speed, merge_sleep");
-        return -1;
-    }
 #ifdef __NOT_USE_COWBTREE__
-    if (m_pool.register_item(sizeof(NodePool::ObjectType)) < 0)
+    if (m_node_pool.init(&m_pool) < 0)
     {
-        P_WARNING("failed to register node to mempool");
+        P_WARNING("failed to init m_node_pool");
         return -1;
     }
 #else
-    if (m_pool.register_item(sizeof(BtreePool::ObjectType)) < 0)
+    if (m_btree_pool.init(&m_pool) < 0)
     {
-        P_WARNING("failed to register item for btree");
+        P_WARNING("failed to init m_btree_pool");
         return -1;
     }
 #endif
-    if (m_pool.register_item(sizeof(VNodePool::ObjectType)) < 0)
+    if (m_vnode_pool.init(&m_pool) < 0)
     {
-        P_WARNING("failed to register vnode to mempool");
+        P_WARNING("failed to init m_vnode_pool");
         return -1;
     }
-    if (m_pool.register_item(sizeof(SNodePool::ObjectType)) < 0)
+    if (m_snode_pool.init(&m_pool) < 0)
     {
-        P_WARNING("failed to register snode to mempool");
+        P_WARNING("failed to init m_snode_pool");
         return -1;
     }
-    if (m_pool.register_item(sizeof(INodePool::ObjectType)) < 0)
+    if (m_inode_pool.init(&m_pool) < 0)
     {
-        P_WARNING("failed to register inode to mempool");
+        P_WARNING("failed to init m_inode_pool");
         return -1;
     }
-    if (m_pool.register_item(sizeof(SkipListPool::ObjectType)) < 0)
+    if (m_skiplist_pool.init(&m_pool) < 0)
     {
-        P_WARNING("failed to register skiplist to mempool");
+        P_WARNING("failed to init m_skiplist_pool");
         return -1;
     }
-    if (m_pool.register_item(sizeof(IDListPool::ObjectType)) < 0)
+    if (m_idlist_pool.init(&m_pool) < 0)
     {
-        P_WARNING("failed to register idlist to mempool");
+        P_WARNING("failed to init m_idlist_pool");
         return -1;
     }
     uint32_t max_items_num;
@@ -191,21 +161,22 @@ int InvertIndex::init(const char *path, const char *file)
         P_WARNING("failed to init mempool");
         return -1;
     }
-#ifdef __NOT_USE_COWBTREE__
-    m_node_pool.init(&m_pool);
-#else
+#ifndef __NOT_USE_COWBTREE__
     if (m_rpool.init(max_items_num) < 0)
     {
         P_WARNING("failed to init mempool");
         return -1;
     }
-    m_btree_pool.init(&m_pool);
 #endif
-    m_vnode_pool.init(&m_pool);
-    m_snode_pool.init(&m_pool);
-    m_inode_pool.init(&m_pool);
-    m_skiplist_pool.init(&m_pool);
-    m_idlist_pool.init(&m_pool);
+    if (!parseUInt32(conf["merge_threshold"], m_merge_threshold)
+            || !parseUInt32(conf["merge_all_threshold"], m_merge_all_threshold)
+            || !parseUInt32(conf["merge_speed"], m_merge_speed)
+            || !parseUInt32(conf["merge_sleep"], m_merge_sleep))
+    {
+        P_WARNING("failed to get uint32 value for merge_threshold,"
+                " merge_all_threshold, merge_speed, merge_sleep");
+        return -1;
+    }
     uint32_t signdict_hash_size;
     if (!parseUInt32(conf["signdict_hash_size"], signdict_hash_size))
     {
