@@ -24,6 +24,52 @@
 #include "log_utils.h"
 #include "str_utils.h"
 
+cJSON *parse_invert_json(const std::string &json, std::vector<invert_data_t> &values)
+{
+    values.clear();
+
+    cJSON *cjson = cJSON_Parse(json.c_str());
+    if (NULL == cjson)
+    {
+        P_WARNING("failed to parse json<%s>", json.c_str());
+        return NULL;
+    }
+    invert_data_t data;
+    if (cJSON_Object != cjson->type)
+    {
+        P_WARNING("invalid json<%s>, must be an Object", json.c_str());
+        goto FAIL;
+    }
+    for (cJSON *c = cjson->child; c; c = c->next)
+    {
+        int type = -1;
+        if (!parseInt32(c->string, type) || type >= UINT8_MAX || type < 0)
+        {
+            P_WARNING("invalid json<%s>, invert type<%s> must be an uint8_t[0, 0xFF)",
+                    json.c_str(), c->string);
+            goto FAIL;
+        }
+        if (cJSON_Object != c->type)
+        {
+            P_WARNING("invalid json<%s>, inverts[%d] must be an Object", json.c_str(), (int)type);
+            goto FAIL;
+        }
+        for (cJSON *cc = c->child; cc; cc = cc->next)
+        {
+            if (!data.set(type, cc))
+            {
+                goto FAIL;
+            }
+            values.push_back(data);
+        }
+    }
+    return cjson;
+FAIL:
+    values.clear();
+    cJSON_Delete(cjson);
+    return NULL;
+}
+
 typedef AddList<InvertIndex::SkipList> AddListImpl;
 typedef DeleteList<InvertIndex::SkipList> DeleteListImpl;
 

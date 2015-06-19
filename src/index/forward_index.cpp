@@ -13,6 +13,43 @@ std::map<std::string, IDMapper_creater> g_id_mappers;
 
 using namespace google::protobuf;
 
+cJSON *parse_forward_json(const std::string &json, std::vector<forward_data_t> &values)
+{
+    values.clear();
+
+    cJSON *object = cJSON_Parse(json.c_str());
+    if (NULL == object)
+    {
+        P_WARNING("failed to parse json<%s>", json.c_str());
+        return NULL;
+    }
+    forward_data_t data;
+    if (cJSON_Object != object->type)
+    {
+        P_WARNING("invalid json<%s>, must be an Object", json.c_str());
+        goto FAIL;
+    }
+    for (cJSON *c = object->child; c; c = c->next)
+    {
+        if (cJSON_Array != c->type) {
+            if (data.set(c)) {
+                values.push_back(data);
+            } else {
+                goto FAIL;
+            }
+        } else {
+            P_WARNING("invalid json<%s>, value of <%s> cannot be an Array",
+                    json.c_str(), c->string);
+            goto FAIL;
+        }
+    }
+    return object;
+FAIL:
+    values.clear();
+    cJSON_Delete(object);
+    return NULL;
+}
+
 struct FieldConfig
 {
     std::string name;
