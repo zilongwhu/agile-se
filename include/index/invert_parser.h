@@ -11,7 +11,7 @@ class InvertParser
         InvertParser() { }
         virtual ~ InvertParser() { }
 
-        virtual void *parse(cJSON *json) = 0;
+        virtual void *parse(const cJSON *json) = 0;
 };
 
 typedef InvertParser *(*InvertParser_creater)();

@@ -138,7 +138,20 @@ class InvertIndex
         DocList *trigger(const char *keystr, uint8_t type) const;
         bool get_signs_by_docid(int32_t docid, std::vector<uint32_t> &signs) const;
 
-        bool insert(int32_t docid, const invert_data_t &data);
+        bool insert(int32_t docid, const std::vector<invert_data_t> &data)
+        {
+            bool ret = true;
+            for (size_t i = 0; i < data.size(); ++i)
+            {
+                ret = this->insert(docid, data[i]) && ret;
+            }
+            return ret;
+        }
+        bool insert(int32_t docid, const invert_data_t &data)
+        {
+            return this->insert(data.key, data.type, docid, data.value);
+        }
+        bool insert(const char *keystr, uint8_t type, int32_t docid, const cJSON *json);
         bool remove(const char *keystr, uint8_t type, int32_t docid);
         bool remove(int32_t docid);
         bool update_docid(int32_t from, int32_t to);

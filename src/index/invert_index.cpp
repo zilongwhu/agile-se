@@ -456,11 +456,8 @@ bool InvertIndex::get_signs_by_docid(int32_t docid, std::vector<uint32_t> &signs
     return true;
 }
 
-bool InvertIndex::insert(int32_t docid, const invert_data_t &data)
+bool InvertIndex::insert(const char *keystr, uint8_t type, int32_t docid, const cJSON *json)
 {
-    const char *const keystr = data.key;
-    const uint8_t type = data.type;
-    cJSON *const json = data.value;
     if (NULL == keystr)
     {
         P_WARNING("invalid parameter: keystr is NULL");

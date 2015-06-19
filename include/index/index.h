@@ -154,11 +154,7 @@ class Index
             {
                 return false;
             }
-            for (size_t i = 0; i < inverts.size(); ++i)
-            {
-                m_invert.insert(ids.new_id, inverts[i]);
-            }
-            return true;
+            return m_invert.insert(ids.new_id, inverts);
         }
         bool remove(int32_t docid)
         {
