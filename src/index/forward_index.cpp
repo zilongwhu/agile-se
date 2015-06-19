@@ -420,78 +420,7 @@ int32_t ForwardIndex::get_id_by_oid(int32_t oid) const
     return -1;
 }
 
-bool ForwardIndex::update(int32_t oid, cJSON *array, ids_t *p_ids)
-{
-    if (NULL == array)
-    {
-        P_WARNING("array is NULL");
-        return false;
-    }
-    if (cJSON_Array != array->type)
-    {
-        P_WARNING("json must be an array");
-        return false;
-    }
-    std::vector<std::pair<std::string, cJSON *> > tmp;
-    for (int i = 0, sz = cJSON_GetArraySize(array); i < sz; ++i)
-    {
-        cJSON *item = cJSON_GetArrayItem(array, i);
-        if (cJSON_Object != item->type)
-        {
-            P_WARNING("item[%d] must be an object who has k and v", i);
-            continue;
-        }
-        cJSON *key = cJSON_GetObjectItem(item, "k");
-        if (NULL == key)
-        {
-            P_WARNING("item[%d].k is not exist", i);
-            continue;
-        }
-        if (cJSON_String != key->type || NULL == key->valuestring)
-        {
-            P_WARNING("item[%d].k must be a string", i);
-            continue;
-        }
-        cJSON *value = cJSON_GetObjectItem(item, "v");
-        if (NULL == value)
-        {
-            P_WARNING("item[%d].v is not exist", i);
-            continue;
-        }
-        tmp.push_back(std::make_pair(std::string(key->valuestring), value));
-    }
-    return this->update(oid, tmp, p_ids);
-}
-
-bool ForwardIndex::update(int32_t oid, const std::vector<std::pair<std::string, std::string> > &kvs, ids_t *p_ids)
-{
-    std::vector<std::pair<std::string, cJSON *> > tmp;
-    for (size_t i = 0; i < kvs.size(); ++i)
-    {
-        cJSON *json = cJSON_Parse(kvs[i].second.c_str());
-        if (NULL == json)
-        {
-            P_WARNING("failed to parse json[%s]", kvs[i].second.c_str());
-            break;
-        }
-        tmp.push_back(std::make_pair(kvs[i].first, json));
-    }
-    bool ret = true;
-    if (tmp.size() < kvs.size())
-    {
-        ret = false;
-        goto CLEAN;
-    }
-    ret = this->update(oid, tmp, p_ids);
-CLEAN:
-    for (size_t i = 0; i < tmp.size(); ++i)
-    {
-        cJSON_Delete(tmp[i].second);
-    }
-    return ret;
-}
-
-bool ForwardIndex::update(int32_t oid, const std::vector<std::pair<std::string, cJSON *> > &kvs, ids_t *p_ids)
+bool ForwardIndex::update(int32_t oid, const std::vector<forward_data_t> &fields, ids_t *p_ids)
 {
     vaddr_t vnew = m_pool.alloc(m_info_size);
     void *mem = m_pool.addr(vnew);
@@ -555,39 +484,41 @@ bool ForwardIndex::update(int32_t oid, const std::vector<std::pair<std::string, 
     cleanup_data_t cd;
     cd.mem = NULL;
     cd.addr = 0;
-    for (size_t i = 0; i < kvs.size(); ++i)
+    for (size_t i = 0; i < fields.size(); ++i)
     {
-        const std::pair<std::string, cJSON *> &kv = kvs[i];
-        __gnu_cxx::hash_map<std::string, FieldDes>::const_iterator it = m_fields.find(kv.first);
+        const forward_data_t &field = fields[i];
+        __gnu_cxx::hash_map<std::string, FieldDes>::const_iterator it
+            = m_fields.find(field.key);
         if (it == m_fields.end())
         {
             continue;
         }
-        int array_offset = it->second.array_offset;
-        int type = it->second.type;
+        const int array_offset = it->second.array_offset;
+        const int type = it->second.type;
         if (INT_TYPE == type)
         {
-            if (kv.second->type == cJSON_Number)
+            if (cJSON_Number == field.value->type)
             {
-                ((int *)mem)[array_offset] = kv.second->valueint;
+                ((int *)mem)[array_offset] = field.value->valueint;
             }
         }
         else if (FLOAT_TYPE == type)
         {
-            if (kv.second->type == cJSON_Number)
+            if (cJSON_Number == field.value->type)
             {
-                ((float *)mem)[array_offset] = kv.second->valuedouble;
+                ((float *)mem)[array_offset] = field.value->valuedouble;
             }
         }
         else if (BINARY_TYPE == type)
         {
-            if (cJSON_String == kv.second->type && kv.second->valuestring)
+            if (cJSON_String == field.value->type && field.value->valuestring)
             {
-                int inlen = ::strlen(kv.second->valuestring);
+                const int inlen = ::strlen(field.value->valuestring);
                 int outlen = sizeof(m_binary_buffer);
-                if (::std_base64_decode(m_binary_buffer, &outlen, kv.second->valuestring, inlen) != 0)
+                if (::std_base64_decode(m_binary_buffer, &outlen, field.value->valuestring, inlen) != 0)
                 {
-                    P_WARNING("failed to decode binary[%s], field_name[%s]", kv.second->valuestring, kv.first.c_str());
+                    P_WARNING("failed to decode binary[%s], field_name[%s]",
+                            field.value->valuestring, field.key);
                     goto FAIL;
                 }
                 uint32_t binary_size = 0;
@@ -601,7 +532,7 @@ bool ForwardIndex::update(int32_t oid, const std::vector<std::pair<std::string, 
                 }
                 if (0 == binary_size)
                 {
-                    P_WARNING("too long binary length=%d, field_name[%s]", outlen, kv.first.c_str());
+                    P_WARNING("too long binary length=%d, field_name[%s]", outlen, field.key);
                     goto FAIL;
                 }
                 vaddr_t vbinary = m_pool.alloc(binary_size);
@@ -611,15 +542,15 @@ bool ForwardIndex::update(int32_t oid, const std::vector<std::pair<std::string, 
                     P_WARNING("failed to alloc binary, size=%u", binary_size);
                     goto FAIL;
                 }
-                binary[0] = outlen;
-                binary[1] = binary_size;
+                binary[0] = outlen; /* real length */
+                binary[1] = binary_size; /* alloced length */
                 ::memcpy(binary + 2, m_binary_buffer, outlen);
                 ((vaddr_t *)mem)[array_offset] = vbinary;
                 cd.binary_fields.push_back(array_offset);
             }
             else
             {
-                P_WARNING("invalid json type, field_name[%s]", kv.first.c_str());
+                P_WARNING("invalid json type, field_name[%s]", field.key);
                 goto FAIL;
             }
         }
@@ -628,30 +559,30 @@ bool ForwardIndex::update(int32_t oid, const std::vector<std::pair<std::string, 
             Message *ptr = it->second.default_message->New();
             if (NULL == ptr)
             {
-                P_WARNING("failed to new protobuf from default message, field_name[%s]", kv.first.c_str());
+                P_WARNING("failed to new protobuf from default message, field_name[%s]", field.key);
                 goto FAIL;
             }
             ((void **)mem)[array_offset] = ptr;
             cd.protobuf_fields.push_back(array_offset);
-            if (cJSON_String == kv.second->type)
+            if (cJSON_String == field.value->type)
             {
-                if (!json2pb(*ptr, kv.second->valuestring))
+                if (!json2pb(*ptr, field.value->valuestring))
                 {
-                    P_WARNING("failed to parse from json, field_name[%s]", kv.first.c_str());
+                    P_WARNING("failed to parse from json, field_name[%s]", field.key);
                     goto FAIL;
                 }
             }
-            else if (cJSON_Object == kv.second->type)
+            else if (cJSON_Object == field.value->type)
             {
-                if (!json2pb(*ptr, kv.second))
+                if (!json2pb(*ptr, field.value))
                 {
-                    P_WARNING("failed to parse from json, field_name[%s]", kv.first.c_str());
+                    P_WARNING("failed to parse from json, field_name[%s]", field.key);
                     goto FAIL;
                 }
             }
             else
             {
-                P_WARNING("invalid json type, field_name[%s]", kv.first.c_str());
+                P_WARNING("invalid json type, field_name[%s]", field.key);
                 goto FAIL;
             }
         }
@@ -664,7 +595,8 @@ bool ForwardIndex::update(int32_t oid, const std::vector<std::pair<std::string, 
     }
     P_TRACE("map oid[%d] to id[%d]", oid, id);
 
-    if (old_id != id && !m_idmap->insert(oid, id)) /* modify m_idmap first, it is used by inc thread only */
+    if (old_id != id && !m_idmap->insert(oid, id))
+        /* modify m_idmap first, it is used by inc thread only */
     {
         P_WARNING("failed to map oid[%d] => id[%d]", oid, id);
         goto FAIL;

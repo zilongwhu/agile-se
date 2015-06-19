@@ -15,6 +15,25 @@
 #include "fsint.h"
 #include <google/protobuf/message.h>
 
+struct forward_data_t
+{
+    const char *key;
+    cJSON *value;
+
+    bool set(cJSON *value)
+    {
+        key = value->string;
+        if (NULL == key || '\0' == key[0])
+        {
+            P_WARNING("invalid key");
+            return false;
+        }
+        this->value = value;
+        return true;
+    }
+};
+cJSON *parse_forward_json(const std::string &json, std::vector<forward_data_t> &values);
+
 class ForwardIndex
 {
     public:
@@ -185,15 +204,7 @@ class ForwardIndex
             return m_pool.addr(add);
         }
 
-        bool update(int32_t oid, cJSON *array, ids_t *p_ids = NULL);
-        bool update(int32_t oid, const std::string &key, const std::string &value, ids_t *p_ids = NULL)
-        {
-            std::vector<std::pair<std::string, std::string> > kvs;
-            kvs.push_back(std::make_pair(key, value));
-            return this->update(oid, kvs, p_ids);
-        }
-        bool update(int32_t oid, const std::vector<std::pair<std::string, std::string> > &kvs, ids_t *p_ids = NULL);
-        bool update(int32_t oid, const std::vector<std::pair<std::string, cJSON *> > &kvs, ids_t *p_ids = NULL);
+        bool update(int32_t oid, const std::vector<forward_data_t> &fields, ids_t *p_ids = NULL);
 
         bool remove(int32_t oid, int32_t *p_id = NULL);
 

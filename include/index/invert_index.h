@@ -32,6 +32,27 @@
 #include "pool/mempool2.h"
 #endif
 
+struct invert_data_t
+{
+    int type;
+    const char *key;
+    cJSON *value;
+
+    bool set(int type, cJSON *value)
+    {
+        key = value->string;
+        if (NULL == key || '\0' == key[0])
+        {
+            P_WARNING("invalid key");
+            return false;
+        }
+        this->type = type;
+        this->value = value;
+        return true;
+    }
+};
+cJSON *parse_invert_json(const std::string &json, std::vector<invert_data_t> &values);
+
 class InvertIndex
 {
     public:

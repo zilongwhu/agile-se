@@ -155,7 +155,7 @@ bool default_base_builder(base_build_t &args)
                 {
                     P_MYLOG("failed to parse invert json");
                 }
-                else if (!args.forward->update(oid, forward_json))
+                else if (!args.forward->update(oid, fields))
                 {
                     P_MYLOG("failed to update forward index");
                 }

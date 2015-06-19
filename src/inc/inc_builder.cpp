@@ -28,7 +28,7 @@ namespace inc
         for (cJSON *c = object->child; c; c = c->next)
         {
             if (cJSON_Array != c->type) {
-                if (data.build(c)) {
+                if (data.set(c)) {
                     values.push_back(data);
                 } else {
                     goto FAIL;
@@ -77,7 +77,7 @@ namespace inc
             }
             for (cJSON *cc = c->child; cc; cc = cc->next)
             {
-                if (!data.build(type, cc))
+                if (!data.set(type, cc))
                 {
                     goto FAIL;
                 }

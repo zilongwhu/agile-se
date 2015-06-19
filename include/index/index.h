@@ -137,12 +137,8 @@ class Index
         }
     public: /* 更新接口 */
         /* 正排更新 */
-        bool forward_update(int32_t docid, const std::vector<std::pair<std::string, std::string> > &fields,
+        bool forward_update(int32_t docid, const std::vector<forward_data_t> &fields,
                 ForwardIndex::ids_t *p_ids = NULL)
-        {
-            return m_forward.update(docid, fields, p_ids);
-        }
-        bool forward_update(int32_t docid, cJSON *fields, ForwardIndex::ids_t *p_ids = NULL)
         {
             return m_forward.update(docid, fields, p_ids);
         }
