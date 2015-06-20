@@ -1,4 +1,6 @@
 #include <sstream>
+#include <stdio.h>
+#include <openssl/md5.h>
 #include "configure.h"
 #include "log_utils.h"
 #include "index/invert_type.h"
@@ -89,4 +91,84 @@ int InvertTypes::init(const char *path, const char *file)
 FAIL:
     this->destroy();
     return -1;
+}
+
+bool InvertTypes::is_valid_type(uint8_t type) const
+{
+    return types[type].type == type;
+}
+
+bool InvertTypes::create_sign(const char *keystr, uint8_t type,
+        char *buffer, uint32_t &buffer_len, uint64_t &sign) const
+{
+    int len = ::snprintf(buffer, buffer_len, "%s%s", types[type].prefix, keystr);
+    if (len < 0)
+    {
+        P_WARNING("snprintf error");
+        return false;
+    }
+    if (len >= (int)buffer_len)
+    {
+        P_WARNING("too long word[%s], type[%d]", keystr, (int)type);
+        return false;
+    }
+    buffer_len = len;
+
+    unsigned int md5res[4];
+    MD5((unsigned char*)buffer,(unsigned int)len,(unsigned char*)md5res);
+
+    sign = md5res[0]+md5res[1];
+    sign <<= 32;
+    sign |= md5res[2]+md5res[3];
+
+    return true;
+}
+
+uint32_t InvertTypes::get_sign(const char *keystr, uint8_t type) const /* 0 is invalid */
+{
+    char buffer[256];
+    uint32_t len = sizeof(buffer);
+    uint64_t sign;
+    uint32_t id = 0;
+    if (this->create_sign(keystr, type, buffer, len, sign))
+    {
+        sign2id_dict->find(sign, id);
+    }
+    return id;
+}
+
+uint32_t InvertTypes::record_sign(const char *keystr, uint8_t type) /* 0 is invalid */
+{
+    char buffer[256];
+    uint32_t len = sizeof(buffer);
+    uint64_t sign;
+    uint32_t id = 0;
+    if (this->create_sign(keystr, type, buffer, len, sign))
+    {
+        sign2id_dict->find_or_insert(sign, buffer, len, id);
+    }
+    return id;
+}
+
+void InvertTypes::destroy()
+{
+    for (size_t i = 0; i < sizeof(types)/sizeof(types[0]); ++i)
+    {
+        if (types[i].parser)
+        {
+            delete types[i].parser;
+        }
+    }
+    this->clear();
+}
+
+void InvertTypes::clear()
+{
+    ::memset(types, 0, sizeof types);
+    for (size_t i = 0; i < sizeof(types)/sizeof(types[0]); ++i)
+    {
+        types[i].type = 0xFF;
+    }
+    sign2id_dict = NULL;
+    m_meta.clear();
 }
