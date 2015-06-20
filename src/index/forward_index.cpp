@@ -92,15 +92,31 @@ bool FieldIterator::next(std::string &field_name, value_t &value)
     return true;
 }
 
-struct FieldConfig
+void ForwardIndex::cleanup_data_t::clean(Pool *pool)
 {
-    std::string name;
-    std::string pb_name;
-    int type;
-    int offset;
-    int size;
-    double default_value;
-};
+    if (NULL == mem || NULL == pool)
+    {
+        return ;
+    }
+    for (size_t i = 0; i < binary_fields.size(); ++i)
+    {
+        vaddr_t vbinary = ((vaddr_t *)mem)[binary_fields[i]];
+        void *binary = pool->addr(vbinary);
+        if (binary)
+        {
+            pool->free(vbinary, ((uint32_t *)binary)[1]);
+        }
+    }
+    for (size_t i = 0; i < protobuf_fields.size(); ++i)
+    {
+        google::protobuf::Message *message =
+            (google::protobuf::Message *)((void **)mem)[protobuf_fields[i]];
+        if (message)
+        {
+            delete message;
+        }
+    }
+}
 
 void ForwardIndex::cleanup(Hash::node_t *node, intptr_t arg)
 {
@@ -119,6 +135,21 @@ void ForwardIndex::cleanup(Hash::node_t *node, intptr_t arg)
     cd.clean(&ptr->m_pool);
     ptr->m_pool.free(cd.addr, ptr->m_info_size);
     ptr->m_delayed_list.pop_front();
+}
+
+ForwardIndex::ForwardIndex()
+{
+    m_idmap = NULL;
+    m_dict = NULL;
+    m_map = NULL;
+    /* supported binary size, hard code */
+    m_binary_size.push_back(256);
+    m_binary_size.push_back(512);
+    m_binary_size.push_back(1024);
+    m_binary_size.push_back(2048);
+    m_binary_size.push_back(4096);
+    m_binary_size.push_back(1024*1024);
+    /* supported binary size, hard code */
 }
 
 ForwardIndex::~ForwardIndex()
@@ -152,6 +183,16 @@ ForwardIndex::~ForwardIndex()
     m_pool.recycle();
 }
 
+struct FieldConfig
+{
+    std::string name;
+    std::string pb_name;
+    int type;
+    int offset;
+    int size;
+    double default_value;
+};
+
 int ForwardIndex::init(const char *path, const char *file)
 {
     TRY
@@ -162,19 +203,18 @@ int ForwardIndex::init(const char *path, const char *file)
             P_WARNING("failed parse config[%s:%s]", path, file);
             return -1;
         }
-        std::ostringstream oss;
         int max_size = 0;
-        std::vector<FieldConfig> fields;
         uint32_t field_size = 0;
-        if (!parseUInt32(conf["FieldSize"], field_size))
+        std::vector<FieldConfig> fields;
+        if (!parseUInt32(conf["field_size"], field_size))
         {
             P_WARNING("failed to get FieldSize[uint32_t]");
             return -1;
         }
+        std::ostringstream oss;
+        oss << "field_size: " << field_size << std::endl;
         for (uint32_t i = 0; i < field_size; ++i)
         {
-            oss << "[@Fields]" << std::endl;
-
             char tmpbuf[256];
             FieldConfig field;
 
