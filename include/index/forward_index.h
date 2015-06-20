@@ -34,8 +34,41 @@ struct forward_data_t
 };
 cJSON *parse_forward_json(const std::string &json, std::vector<forward_data_t> &values);
 
+class ForwardIndex;
+class FieldIterator
+{
+    public:
+        struct value_t
+        {
+            int type;
+            union {
+                int intvalue;
+                float floatvalue;
+                const google::protobuf::Message *message;
+                struct 
+                {
+                    void *binary;
+                    int binarylen;
+                };
+            };
+        };
+        FieldIterator(const ForwardIndex *idx, void *info)
+            : m_idx(idx)
+        {
+            m_pos = 0;
+            m_info = info;
+        }
+        bool next(std::string &field_name, value_t &value);
+    private:
+        size_t m_pos;
+        void *m_info;
+        const ForwardIndex *m_idx;
+};
+
 class ForwardIndex
 {
+    private:
+        friend class FieldIterator;
     public:
         enum { INT_TYPE = 0, FLOAT_TYPE, PROTO_TYPE, BINARY_TYPE };
         struct ids_t
@@ -72,60 +105,6 @@ class ForwardIndex
             };
         };
     public:
-        class FieldIterator
-        {
-            public:
-                union value_t
-                {
-                    int     iv;
-                    float   fv;
-                    vaddr_t bv;
-                    void    *pv;
-                };
-                FieldIterator(const ForwardIndex *idx, void *info)
-                    : m_idx(idx)
-                {
-                    m_pos = 0;
-                    m_info = info;
-                }
-
-                bool next(std::string &field_name, int &type, value_t &value)
-                {
-                    value.pv = NULL; /* init */
-                    if (m_pos >= m_idx->m_field_names.size())
-                    {
-                        return false;
-                    }
-                    field_name = m_idx->m_field_names[m_pos].second;
-                    __gnu_cxx::hash_map<std::string, FieldDes>::const_iterator it = m_idx->m_fields.find(field_name);
-                    if (it != m_idx->m_fields.end())
-                    {
-                        type = it->second.type;
-                        switch(type)
-                        {
-                            case INT_TYPE:
-                                value.iv = ((int *)m_info)[it->second.array_offset];
-                                break;
-                            case FLOAT_TYPE:
-                                value.fv = ((float *)m_info)[it->second.array_offset];
-                                break;
-                            case BINARY_TYPE:
-                                value.bv = ((vaddr_t *)m_info)[it->second.array_offset];
-                                break;
-                            case PROTO_TYPE:
-                                value.pv = ((void **)m_info)[it->second.array_offset];
-                                break;
-                        }
-                    }
-                    ++m_pos;
-                    return true;
-                }
-            private:
-                size_t m_pos;
-                void *m_info;
-                const ForwardIndex *m_idx;
-        };
-
         class iterator
         {
             public:

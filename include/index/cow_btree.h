@@ -2,6 +2,7 @@
 #define __AGILE_SE_COW_B_TREE_H__
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <limits.h>
 #include <unistd.h>
 #include <string.h>

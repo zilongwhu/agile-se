@@ -110,10 +110,6 @@ class Index
             return m_invert.parse_hp(query, terms, new_query);
         }
     public: /* 正排查询接口 */
-        int32_t get_field_offset_by_name(const char *field_name) const
-        {
-            return m_forward.get_offset_by_name(field_name);
-        }
         int32_t get_field_array_offset_by_name(const char *field_name) const
         {
             return m_forward.get_array_offset_by_name(field_name);
@@ -131,7 +127,7 @@ class Index
             return m_forward.unpack(addr);
         }
     public: /* 获取正排字段迭代器 */
-        ForwardIndex::FieldIterator get_field_iterator(void *info) const
+        FieldIterator get_field_iterator(void *info) const
         {
             return this->m_forward.get_field_iterator(info);
         }

@@ -50,6 +50,48 @@ FAIL:
     return NULL;
 }
 
+bool FieldIterator::next(std::string &field_name, value_t &value)
+{
+    ::bzero(&value, sizeof(value));
+    if (m_pos >= m_idx->m_field_names.size())
+    {
+        return false;
+    }
+    field_name = m_idx->m_field_names[m_pos].second;
+    __gnu_cxx::hash_map<std::string, ForwardIndex::FieldDes>::const_iterator it
+        = m_idx->m_fields.find(field_name);
+    if (it != m_idx->m_fields.end())
+    {
+        value.type = it->second.type;
+        switch(value.type)
+        {
+            case ForwardIndex::INT_TYPE:
+                value.intvalue = ((int *)m_info)[it->second.array_offset];
+                break;
+            case ForwardIndex::FLOAT_TYPE:
+                value.floatvalue = ((float *)m_info)[it->second.array_offset];
+                break;
+            case ForwardIndex::BINARY_TYPE:
+                {
+                    ForwardIndex::vaddr_t vaddr = ((ForwardIndex::vaddr_t *)
+                            m_info)[it->second.array_offset];
+                    int *bv = (int *)m_idx->unpack(vaddr);
+                    if (bv)
+                    {
+                        value.binarylen = bv[0];
+                        value.binary = bv + 2;
+                    }
+                    break;
+                }
+            case ForwardIndex::PROTO_TYPE:
+                value.message = ((google::protobuf::Message **)m_info)[it->second.array_offset];
+                break;
+        }
+    }
+    ++m_pos;
+    return true;
+}
+
 struct FieldConfig
 {
     std::string name;
