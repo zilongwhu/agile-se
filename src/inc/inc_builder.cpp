@@ -31,7 +31,7 @@ namespace inc
             if (now != g_now_time)
             {
                 P_MYLOG("processe stats: doc_num[%d], update[forward=%u, invert=%u], delete[%u], in[%u ~ %u]",
-                        (int)idx.docs_num(), update_forward_count, update_invert_count, delete_count,
+                        (int)idx.doc_num(), update_forward_count, update_invert_count, delete_count,
                         now, g_now_time);
     
                 idx.recycle();

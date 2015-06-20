@@ -122,6 +122,10 @@ class InvertIndex
         ~ InvertIndex();
 
         int init(const char *path, const char *file);
+        bool load(const char *dir, FSInterface *fs = NULL);
+        bool dump(const char *dir, FSInterface *fs = NULL);
+
+        size_t doc_num() const { return m_words_bag->size(); }
 
         bool is_valid_type(uint8_t type) const
         {
@@ -132,10 +136,14 @@ class InvertIndex
             return m_types.get_sign(keystr, type);
         }
 
+        /* use binary logic DocList */
         DocList *parse(const std::string &query, const std::vector<term_t> &terms) const;
+        /* use conjunction, disjunction */
         DocList *parse_hp(const std::string &query, const std::vector<term_t> &terms,
                 std::string *new_query = NULL) const;
+        /* get a invert list */
         DocList *trigger(const char *keystr, uint8_t type) const;
+        /* get all related lists of docid */
         bool get_signs_by_docid(int32_t docid, std::vector<uint32_t> &signs) const;
 
         bool insert(int32_t docid, const std::vector<invert_data_t> &data)
@@ -151,9 +159,13 @@ class InvertIndex
         {
             return this->insert(data.key, data.type, docid, data.value);
         }
+        /* insert docid to list: type + keystr */
         bool insert(const char *keystr, uint8_t type, int32_t docid, const cJSON *json);
+        /* remove docid from list: type + keystr */
         bool remove(const char *keystr, uint8_t type, int32_t docid);
+        /* remove docid from all related lists */
         bool remove(int32_t docid);
+        /* update docid: from->to, all related lists are updated */
         bool update_docid(int32_t from, int32_t to);
 
         void recycle()
@@ -163,20 +175,12 @@ class InvertIndex
             m_rpool.recycle();
 #endif
         }
-        size_t docs_num() const
-        {
-            return this->m_words_bag->size();
-        }
         void print_meta() const;
         void print_list_length(const char *filename = NULL) const;
 
         void try_exc_cmd();
         void exc_cmd() const;
 
-        bool load(const char *dir, FSInterface *fs = NULL);
-        bool dump(const char *dir, FSInterface *fs = NULL);
-
-        size_t doc_num() const { return m_words_bag->size(); }
         void mergeAll(uint32_t length);
     private:
         DocList *trigger(uint32_t sign) const;

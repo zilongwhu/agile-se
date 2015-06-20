@@ -67,7 +67,7 @@ class Index
         void exc_cmd() const { m_invert.exc_cmd(); }
         void try_exc_cmd() { m_invert.try_exc_cmd(); }
 
-        size_t docs_num() const { return m_invert.docs_num(); }
+        size_t doc_num() const { return m_invert.doc_num(); }
         bool is_base_mode() const { return m_conf.base_mode != 0; }
 
         void try2merge()
