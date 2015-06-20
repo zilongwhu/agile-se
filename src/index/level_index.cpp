@@ -15,7 +15,7 @@ int LevelIndex::init(const char *path, const char *file)
         return -1;
     }
     m_conf.index_name = conf["INDEX_NAME"];
-    m_conf.index_path = conf["INDEX_PATH"];
+    const bool has_index_path = conf.get("INDEX_PATH", m_conf.index_path);
     m_conf.forward_path = conf["FORWARD_PATH"];
     m_conf.forward_file = conf["FORWARD_FILE"];
 
@@ -60,7 +60,7 @@ int LevelIndex::init(const char *path, const char *file)
     P_WARNING("    [REBUILD_INDEX]: %d", m_conf.rebuild_index);
     P_WARNING("    [MERGE_INTERVAL]: %d s", m_conf.merge_interval);
 
-    if (m_dual_dir.init(m_conf.index_path.c_str()) < 0)
+    if (has_index_path && m_dual_dir.init(m_conf.index_path.c_str()) < 0)
     {
         P_WARNING("failed to init index path");
         return -1;
@@ -101,6 +101,11 @@ int LevelIndex::init(const char *path, const char *file)
         return -1;
     }
     P_WARNING("init forward index ok");
+    if (!m_has_invert && m_forward.has_id_mapper())
+    {
+        P_WARNING("LevelIndex without InvertIndex must not have IDMapper in ForwardIndex");
+        return -1;
+    }
 
     if (!m_conf.rebuild_index)
     {
@@ -117,15 +122,20 @@ int LevelIndex::init(const char *path, const char *file)
     return 0;
 }
 
-int LevelIndex::dump()
+int LevelIndex::dump(const char *path)
 {
     P_WARNING("start to dump Index: %s", m_conf.index_name.c_str());
 
-    std::string path = m_dual_dir.writeable_path();
+    std::string path2;
+    if (NULL == path) {
+        path2 = m_dual_dir.writeable_path();
+    } else {
+        path2 = path;
+    }
     if (m_has_invert)
     {
         P_WARNING("start to dump invert index");
-        if (m_invert.dump(path.c_str()) < 0)
+        if (m_invert.dump(path2.c_str()) < 0)
         {
             P_WARNING("failed to dump invert index");
             return -1;
@@ -134,14 +144,14 @@ int LevelIndex::dump()
     }
 
     P_WARNING("start to dump forward index");
-    if (m_forward.dump(path.c_str()) < 0)
+    if (m_forward.dump(path2.c_str()) < 0)
     {
         P_WARNING("failed to dump forward index");
         return -1;
     }
     P_WARNING("dump forward index ok");
 
-    if (m_dual_dir.switch_using() < 0)
+    if (NULL == path && m_dual_dir.switch_using() < 0)
     {
         P_WARNING("failed to switch using file");
     }

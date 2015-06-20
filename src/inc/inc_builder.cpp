@@ -30,9 +30,11 @@ namespace inc
         {
             if (now != g_now_time)
             {
+                /*
                 P_MYLOG("processe stats: doc_num[%d], update[forward=%u, invert=%u], delete[%u], in[%u ~ %u]",
                         (int)idx.doc_num(), update_forward_count, update_invert_count, delete_count,
                         now, g_now_time);
+                        */
     
                 idx.recycle();
 
@@ -73,7 +75,7 @@ namespace inc
             }
             int ret = reader.next();
             if (0 == ret) {
-                if (idx.is_base_mode())
+                //if (idx.is_base_mode())
                 {
                     P_WARNING("meeting end of base file");
                     idx.dump();

@@ -1,13 +1,11 @@
 #ifndef __AGILE_SE_LEVEL_INDEX_H__
 #define __AGILE_SE_LEVEL_INDEX_H__
 
-#include <pthread.h>
 #include <string>
 #include "index/invert_index.h"
 #include "index/forward_index.h"
 #include "dual_dir.h"
 #include "file_watcher.h"
-#include "inc/inc_reader.h"
 
 // =====================================================================================
 //        Class:  LevelIndex
@@ -25,6 +23,7 @@ class LevelIndex
         ~LevelIndex() { }
 
         int init(const char *path, const char *file); /* 初始化函数，调用一次 */
+        std::string name() const { return m_conf.index_name; }
         size_t doc_num() const
         {
             if (m_has_invert) {
@@ -147,7 +146,7 @@ class LevelIndex
             }
         }
     public:
-        int dump(); /* dump索引到磁盘，0/1目录切换 */
+        int dump(const char *path = NULL); /* dump索引到磁盘，0/1目录切换 */
         void print_meta() const
         {
             if (m_has_invert)
