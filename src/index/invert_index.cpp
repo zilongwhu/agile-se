@@ -119,13 +119,11 @@ int InvertIndex::init(const char *path, const char *file)
         P_WARNING("failed parse config[%s:%s]", path, file);
         return -1;
     }
+    m_exc_cmd_file = conf["commands_file"];
+    if (m_exc_cmd_fw.create(m_exc_cmd_file.c_str()) < 0)
     {
-        m_exc_cmd_file = conf["commands_file"];
-        if (m_exc_cmd_fw.create(m_exc_cmd_file.c_str()) < 0)
-        {
-            P_WARNING("failed to create commands file watcher at[%s]", m_exc_cmd_file.c_str());
-            return -1;
-        }
+        P_WARNING("failed to create commands file watcher at[%s]", m_exc_cmd_file.c_str());
+        return -1;
     }
     /* register items to pool */
     if (SkipList::init_pool(&m_pool, 0) < 0)
@@ -328,8 +326,13 @@ DocList *InvertIndex::trigger(const char *keystr, uint8_t type) const
     return this->trigger(sign);
 }
 
-#if (0)
+#if defined __NOT_USE_COWBTREE__
+#define __USE_OLD_TRIGGER_FLAG__
+#elif defined __USE_OLD_TRIGGER__
+#define __USE_OLD_TRIGGER_FLAG__
+#endif
 
+#ifdef __USE_OLD_TRIGGER_FLAG__
 DocList *InvertIndex::trigger(uint32_t sign) const
 {
 #ifdef __NOT_USE_COWBTREE__
@@ -433,9 +436,7 @@ DocList *InvertIndex::trigger(uint32_t sign) const
     }
     return NULL;
 }
-
 #else
-
 DocList *InvertIndex::trigger(uint32_t sign) const
 {
     vaddr_t *vbig = m_dict->find(sign);
