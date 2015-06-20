@@ -159,6 +159,8 @@ class ForwardIndex
         bool load(const char *dir, FSInterface *fs = NULL);
         bool dump(const char *dir, FSInterface *fs = NULL) const;
 
+        bool has_id_mapper() const { return m_map; }
+
         iterator begin() const { return iterator(this); }
         size_t doc_num() const { return m_dict->size(); }
 
