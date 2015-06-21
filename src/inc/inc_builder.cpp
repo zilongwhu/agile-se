@@ -3,16 +3,23 @@
 #endif
 
 #include <stdint.h>
-#include "inc/inc_builder.h"
+#include <stdlib.h>
+#include <errno.h>
+#include <string>
+#include <vector>
 #include "str_utils.h"
 #include "file_watcher.h"
 #include "meminfo.h"
+#include "cJSON.h"
+#include "log_utils.h"
+#include "index/index.h"
 
 namespace inc
 {
-    int inc_build_index(inc_builder_t *args)
+    enum { OP_INSERT = 0, OP_DELETE = 1, OP_UPDATE = 2 };
+    void *das_processor(void *args)
     {
-        Index &idx = *args->idx;
+        Index &idx = *(Index *)args; 
         IncReader &reader = idx.m_inc_reader;
 
         const size_t log_buffer_length = 4096;
@@ -20,29 +27,23 @@ namespace inc
     
         char *line = reader._line_buf;
         uint32_t now = g_now_time;
-        uint32_t delete_count = 0;
-        uint32_t update_invert_count = 0;
+
         uint32_t update_forward_count = 0;
-    
+        uint32_t update_invert_count = 0;
+        uint32_t delete_count = 0;
+
+        std::vector<std::string> columns;
         std::vector<forward_data_t> fields;
         std::vector<invert_data_t> inverts;
         while (1)
         {
             if (now != g_now_time)
             {
-                /*
-                P_MYLOG("processe stats: doc_num[%d], update[forward=%u, invert=%u], delete[%u], in[%u ~ %u]",
-                        (int)idx.doc_num(), update_forward_count, update_invert_count, delete_count,
-                        now, g_now_time);
-                        */
-    
+                update_forward_count = 0;
+                update_invert_count = 0;
+                delete_count = 0;
+
                 idx.recycle();
-
-                if (args->timer)
-                {
-                    args->timer(args);
-                }
-
                 idx.try2merge();
                 idx.try2dump();
                 idx.try_exc_cmd();
@@ -57,119 +58,100 @@ namespace inc
                     {
                         P_WARNING("memory panic, free: %ld KB, buffers: %ld KB, cached: %ld KB, total: %ld KB",
                                 mi.free(), mi.buffers(), mi.cached(), mi.total());
-                        if (check_count++ % 180 == 0) { /* log fatal every 3 minutes */
+                        if (check_count++ % 360 == 0) { /* log fatal every 3 minutes */
                             P_FATAL("incthread is suspending now");
                         }
-                        ::sleep(1); /* sleep 1 second */
+                        ::usleep(500*1000); /* sleep 500ms */
                     }
                     else
                     {
                         break;
                     }
                 }
-    
-                delete_count = 0;
-                update_invert_count = 0;
-                update_forward_count = 0;
-                now = g_now_time;
             }
             int ret = reader.next();
             if (0 == ret) {
-                //if (idx.is_base_mode())
+                if (idx.is_base_mode())
                 {
                     P_WARNING("meeting end of base file");
                     idx.dump();
 
                     delete [] log_buffer;
-                    return 0;
+                    return NULL;
                 }
-                ::usleep(1000);
+                ::usleep(1000); /* sleep 1 ms */
             } else if (1 == ret) {
-                std::vector<std::string> columns;
-                split(line, "\t", columns);
-                if (columns.size() < 4)
+                reader.split(columns, "\t");
+                if (columns.size() < 3)
                 {
-                    P_MYLOG("must has [eventid, optype, level, oid]");
+                    P_MYLOG("must has {[eventid] level, optype, oid}");
                     continue;
                 }
-                int32_t optype = ::strtol(columns[1].c_str(), NULL, 10);
-                int32_t level = ::strtol(columns[2].c_str(), NULL, 10);
-                int32_t oid = ::strtoul(columns[3].c_str(), NULL, 10);
-                if (oid % reader.total_partition() != reader.current_partition())
+                uint32_t level = 0;
+                uint32_t optype = 0;
+                uint64_t oid = 0;
+                if (!parseUInt32(columns[0], level)
+                        || !parseUInt32(columns[1], optype)
+                        || !parseUInt64(columns[2], oid))
                 {
+                    P_MYLOG("invalid level, optype, oid");
+                    continue;
+                }
+                LevelIndex *lx = idx.get_level_index(level);
+                if (NULL == lx)
+                {
+                    P_MYLOG("invalid level=%u, LevelIndex is NULL", level);
                     continue;
                 }
                 fields.clear();
                 inverts.clear();
-                ForwardIndex::ids_t ids;
-                /*
-                switch (level)
+                switch (optype)
                 {
-                    case FORWARD_LEVEL:
-                        if (OP_UPDATE == optype)
-                        {
-                            cJSON *json = NULL;
-                            if (columns.size() < 5) {
-                                P_MYLOG("forward update need at least 5 fields");
-                            } else if (NULL == (json = parse_forward_json(columns[4], fields))) {
+                    case OP_INSERT:
+                    case OP_UPDATE:
+                        if (columns.size() <= 4) {
+                            cJSON *fjson = NULL;
+                            if (NULL == (fjson = parse_forward_json(columns[3], fields))) {
                                 P_MYLOG("failed to parse forward json");
-                            } else if (!idx.forward_update(oid, fields, &ids)) {
-                                P_MYLOG("failed to update forward index");
-                            } else if (!idx.update_docid(ids.old_id, ids.new_id)) {
-                                P_MYLOG("failed to change docid from %d to %d, oid=%d",
-                                        ids.old_id, ids.new_id, oid);
                             } else {
-                                P_TRACE("update forward ok, oid=%d", oid);
+                                lx->forward_update(oid, fields);
+                                P_TRACE("%s forward ok, level=%u, oid=%lu",
+                                        OP_UPDATE == optype ? "update": "insert", level, oid);
                                 ++update_forward_count;
                             }
-                            cJSON_Delete(json);
-                        }
-                        break;
-                    case INVERT_LEVEL:
-                        if (OP_DELETE == optype)
-                        {
-                            int32_t old_id = -1;
-                            if (idx.forward_remove(oid, &old_id))
-                            {
-                                idx.invert_remove(old_id);
-                            }
-                            P_TRACE("delete ok, oid=%d", oid);
-                            ++delete_count;
-                        }
-                        else if (OP_UPDATE == optype)
-                        {
+                            cJSON_Delete(fjson);
+                        } else if (columns.size() <= 5) {
                             cJSON *fjson = NULL;
                             cJSON *ijson = NULL;
-                            if (columns.size() < 6) {
-                                P_MYLOG("invert update need at least 6 fields");
-                            } else if (NULL == (fjson = parse_forward_json(columns[4], fields)) {
+                            if (NULL == (fjson = parse_forward_json(columns[3], fields))) {
                                 P_MYLOG("failed to parse forward json");
-                            } else if (NULL == (ijson = parse_invert_json(columns[5], inverts)) {
+                            } else if (NULL == (ijson = parse_invert_json(columns[4], inverts))) {
                                 P_MYLOG("failed to parse invert json");
-                            } else if (!idx.forward_update(oid, fields, &ids)) {
-                                P_MYLOG("failed to update forward index");
                             } else {
-                                idx.invert_remove(ids.old_id);
-                                for (size_t i = 0; i < inverts.size(); ++i)
-                                {
-                                    idx.invert_insert(inverts[i].key, inverts[i].type,
-                                        ids.new_id, inverts[i].value);
-                                }
-                                P_TRACE("update ok, oid=%d, id=%d", oid, ids.new_id);
+                                lx->update(oid, fields, inverts);
+                                P_TRACE("%s ok, level=%u, oid=%lu",
+                                        OP_UPDATE == optype ? "update": "insert", level, oid);
                                 ++update_invert_count;
                             }
                             cJSON_Delete(fjson);
                             cJSON_Delete(ijson);
                         }
                         break;
+                    case OP_DELETE:
+                        lx->remove(oid);
+                        P_TRACE("delete ok, level=%u, oid=%lu", level, oid);
+                        ++delete_count;
+                        break;
+                    defalut:
+                        P_MYLOG("invalid optype=%u", optype);
+                        break;
                 };
-                */
             } else if (ret < 0) {
                 P_FATAL("disk file error");
                 break;
             }
         }
         delete [] log_buffer;
-        return -1;
+        return NULL;
     }
 }

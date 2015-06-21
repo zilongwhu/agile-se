@@ -151,11 +151,22 @@ ERROR:
             P_WARNING("too long line at file[%s], line_no[%u], length = %d.", _filepath, _line_no, ret);
         }
         ++_line_no;
+        _eventid = 0;
         if (!_base_mode)
         {
             _eventid = ::strtoul(_line_buf, NULL, 10);
         }
         return 1;
+    }
+
+    void IncReader::split(std::vector<std::string> &columns, const std::string &sep)
+    {
+        columns.clear();
+        ::split(_line_buf, sep, columns);
+        if (_base_mode && columns.size() > 1)
+        {
+            columns.erase(columns.begin());
+        }
     }
     
     int IncReader::snapshot()

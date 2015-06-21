@@ -199,10 +199,10 @@ class LevelIndex
                 m_invert.try_exc_cmd();
             }
         }
-        void try2merge()
+        void try2merge(bool force = false)
         {
-            if (m_has_invert && g_now_time >=
-                    m_last_merge_time + m_conf.merge_interval)
+            if (m_has_invert && (force || g_now_time >=
+                        m_last_merge_time + m_conf.merge_interval))
             {
 #ifndef __NOT_USE_COWBTREE__
                 P_WARNING("start to merge");

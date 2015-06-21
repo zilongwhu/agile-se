@@ -1,5 +1,4 @@
 #include "index/const_index.h"
-#include "inc/inc_builder.h"
 #include "str_utils.h"
 #include "configure.h"
 
@@ -112,73 +111,73 @@ bool default_base_builder(base_build_t &args)
 
     bool ret = true;
     uint32_t total = 0;
-    while (1)
-    {
-        const int n = reader.next();
-        if (n <= 0)
-        {
-            if (0 == n)
-            {
-                P_WARNING("reach EOF, total lines=%u", total);
-                break;
-            }
-            P_WARNING("reader returns -1");
-            ret = false;
-            break;
-        }
-        ++total;
-        std::vector<std::string> columns;
-        split(line, "\t", columns);
-        if (columns.size() < 2)
-        {
-            P_MYLOG("must has [level, oid]");
-            continue;
-        }
-        const int32_t level = ::strtol(columns[0].c_str(), NULL, 10);
-        const int32_t oid = ::strtoul(columns[1].c_str(), NULL, 10);
-        cJSON *forward_json = NULL;
-        cJSON *invert_json = NULL;
-        std::vector<forward_data_t> fields;
-        std::vector<invert_data_t> inverts;
-        switch (level)
-        {
-            case INVERT_LEVEL:
-                if (columns.size() < 4)
-                {
-                    P_MYLOG("invert update need at least 4 fields");
-                }
-                else if (NULL == (forward_json = parse_forward_json(columns[2], fields)))
-                {
-                    P_MYLOG("failed to parse forward json");
-                }
-                else if (NULL == (invert_json = parse_invert_json(columns[3], inverts)))
-                {
-                    P_MYLOG("failed to parse invert json");
-                }
-                else if (!args.forward->update(oid, fields))
-                {
-                    P_MYLOG("failed to update forward index");
-                }
-                else
-                {
-                    args.invert->remove(oid);
-                    for (size_t i = 0; i < inverts.size(); ++i)
-                    {
-                        args.invert->insert(oid, inverts[i]);
-                    }
-                    P_TRACE("update ok, level=%d, oid=%d", level, oid);
-                }
-                break;
-        }
-        if (forward_json)
-        {
-            cJSON_Delete(forward_json);
-        }
-        if (invert_json)
-        {
-            cJSON_Delete(invert_json);
-        }
-    }
+//    while (1)
+//    {
+//        const int n = reader.next();
+//        if (n <= 0)
+//        {
+//            if (0 == n)
+//            {
+//                P_WARNING("reach EOF, total lines=%u", total);
+//                break;
+//            }
+//            P_WARNING("reader returns -1");
+//            ret = false;
+//            break;
+//        }
+//        ++total;
+//        std::vector<std::string> columns;
+//        split(line, "\t", columns);
+//        if (columns.size() < 2)
+//        {
+//            P_MYLOG("must has [level, oid]");
+//            continue;
+//        }
+//        const int32_t level = ::strtol(columns[0].c_str(), NULL, 10);
+//        const int32_t oid = ::strtoul(columns[1].c_str(), NULL, 10);
+//        cJSON *forward_json = NULL;
+//        cJSON *invert_json = NULL;
+//        std::vector<forward_data_t> fields;
+//        std::vector<invert_data_t> inverts;
+//        switch (level)
+//        {
+//            case INVERT_LEVEL:
+//                if (columns.size() < 4)
+//                {
+//                    P_MYLOG("invert update need at least 4 fields");
+//                }
+//                else if (NULL == (forward_json = parse_forward_json(columns[2], fields)))
+//                {
+//                    P_MYLOG("failed to parse forward json");
+//                }
+//                else if (NULL == (invert_json = parse_invert_json(columns[3], inverts)))
+//                {
+//                    P_MYLOG("failed to parse invert json");
+//                }
+//                else if (!args.forward->update(oid, fields))
+//                {
+//                    P_MYLOG("failed to update forward index");
+//                }
+//                else
+//                {
+//                    args.invert->remove(oid);
+//                    for (size_t i = 0; i < inverts.size(); ++i)
+//                    {
+//                        args.invert->insert(oid, inverts[i]);
+//                    }
+//                    P_TRACE("update ok, level=%d, oid=%d", level, oid);
+//                }
+//                break;
+//        }
+//        if (forward_json)
+//        {
+//            cJSON_Delete(forward_json);
+//        }
+//        if (invert_json)
+//        {
+//            cJSON_Delete(invert_json);
+//        }
+//    }
     delete [] log_buffer;
     return ret;
 }

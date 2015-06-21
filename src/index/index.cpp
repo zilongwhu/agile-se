@@ -181,6 +181,10 @@ int Index::dump(const char *path)
             std::string dir = path2 + "/" + m_level2dirname[i];
             if (mk_dir(dir))
             {
+                if (this->is_base_mode())
+                {
+                    m_index[i]->try2merge(true);
+                }
                 P_WARNING("start to dump at: %s", dir.c_str());
                 m_index[i]->dump(dir.c_str());
                 P_WARNING("dump ok at: %s", dir.c_str());

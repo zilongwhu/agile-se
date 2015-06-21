@@ -49,6 +49,7 @@ namespace inc
             int rollback();
     
             int next();
+            void split(std::vector<std::string> &columns, const std::string &sep = "\t");
             int collect_lines(int max_lines, int max_ms);
     
             void log(const char *str);
@@ -59,6 +60,7 @@ namespace inc
             uint32_t get_file_no() const { return _file_no; }
             uint32_t get_line_no() const { return _line_no; }
             uint32_t get_eventid() const { return _eventid; }
+            bool is_base_mode() const { return _base_mode; }
         public:
             char _line_buf[1024*1024*10];       // 10M
         private:

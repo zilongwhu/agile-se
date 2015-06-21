@@ -40,6 +40,10 @@ class Index
             }
         }
     public:
+        bool is_base_mode() const
+        {
+            return m_inc_reader.is_base_mode();
+        }
         int32_t inc_das_warning_time() const
         {
             return m_conf.inc_das_warning_time;
