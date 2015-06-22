@@ -70,7 +70,7 @@ int InvertTypes::init(const char *path, const char *file)
                 || length < 0 || length > 0xFFFF
                 || prefix.length() == 0
                 || prefix.length() >= sizeof(types[i].prefix)
-                || length > 0 && parser.length() == 0)
+                || (length > 0 && parser.length() == 0))
         {
             P_WARNING("invalid config for invert[%d]", i);
             goto FAIL;

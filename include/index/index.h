@@ -75,9 +75,4 @@ class Index
         Index::s_inc_processors[#processor] = processor;\
     } while(0)
 
-namespace inc
-{
-    DECLARE_INC_PROCESSOR(das_processor);
-}
-
 #endif
