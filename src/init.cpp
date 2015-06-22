@@ -9,7 +9,6 @@ namespace inc
 {
     DECLARE_INC_PROCESSOR(das_processor);
 }
-DECLARE_BASE_PROCESSOR(default_base_builder);
 
 void init_nbslib()
 {
@@ -17,5 +16,4 @@ void init_nbslib()
     init_operator_priority();
 
     REGISTER_INC_PROCESSOR(inc::das_processor);
-    REGISTER_BASE_PROCESSOR(default_base_builder);
 }

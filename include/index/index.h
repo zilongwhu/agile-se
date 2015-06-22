@@ -40,6 +40,10 @@ class Index
                 return m_index[level];
             }
         }
+        const LevelIndex *get_level_index(size_t level) const
+        {
+            return const_cast<Index *>(this)->get_level_index(level);
+        }
     public:
         bool is_base_mode() const
         {
