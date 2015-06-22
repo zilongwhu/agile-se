@@ -1,0 +1,8 @@
+inc_name: ads
+inc_file_prefix: ./data/event
+file_no: 0
+line_no: 0
+max_line_no: 100000
+partition_cur: 0
+partition_num: 1
+base_mode: 1

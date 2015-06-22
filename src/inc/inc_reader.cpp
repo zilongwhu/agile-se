@@ -28,7 +28,12 @@ namespace inc
             ret = ret && parseUInt32(conf["max_line_no"].c_str(), _max_line_no);
             ret = ret && parseUInt32(conf["partition_cur"].c_str(), _partition_cur);
             ret = ret && parseUInt32(conf["partition_num"].c_str(), _partition_num);
-            ret = ret && parseUInt32(conf["base_mode"].c_str(), _base_mode);
+            _base_mode = 0;
+            std::string base;
+            if (ret && conf.get("base_mode", base) && !parseUInt32(base, _base_mode))
+            {
+                ret = false;
+            }
             _inc_name = conf["inc_name"];
 
             if (!ret)
@@ -103,6 +108,7 @@ ERROR:
         std::string p(path);
         p += "/" + std::string(meta);
         std::ofstream fout(p.c_str());
+        fout << "inc_name: " << _inc_name << std::endl;
         fout << "inc_file_prefix: " << std::string(_filepath, _path_len) << std::endl;
         fout << "file_no: " << _file_no << std::endl;
         fout << "line_no: " << _line_no << std::endl;
