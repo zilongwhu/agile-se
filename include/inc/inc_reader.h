@@ -14,10 +14,6 @@
 	}while(0)
 #endif
 
-#ifndef PATH_MAX
-#define PATH_MAX (1024)
-#endif
-
 namespace inc
 {
     class IncReader
@@ -64,7 +60,7 @@ namespace inc
         public:
             char _line_buf[1024*1024*10];       // 10M
         private:
-            char _filepath[PATH_MAX];
+            char _filepath[1024*4];
             uint16_t _path_len;
     
             uint32_t _max_line_no;

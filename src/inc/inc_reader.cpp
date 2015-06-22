@@ -29,7 +29,7 @@ namespace inc
             ret = ret && parseUInt32(conf["partition_cur"].c_str(), _partition_cur);
             ret = ret && parseUInt32(conf["partition_num"].c_str(), _partition_num);
             ret = ret && parseUInt32(conf["base_mode"].c_str(), _base_mode);
-            //_inc_name = conf["inc_name"];
+            _inc_name = conf["inc_name"];
 
             if (!ret)
             {
@@ -88,8 +88,8 @@ namespace inc
                 *end = '\0';
             }
         }
-        P_WARNING("init inc_reader ok, filepath[%s] fileno[%u] lineno[%u] max_lineno[%u] partition[%u:%u]%s.",
-                fp.c_str(), _file_no, _line_no, _max_line_no, _partition_cur, _partition_num,
+        P_WARNING("init inc_reader[%s] ok, filepath[%s] fileno[%u] lineno[%u] max_lineno[%u] partition[%u:%u]%s.",
+                _inc_name.c_str(), fp.c_str(), _file_no, _line_no, _max_line_no, _partition_cur, _partition_num,
                 _base_mode ? " base" : "");
         return 0;
 ERROR:
