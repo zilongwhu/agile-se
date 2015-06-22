@@ -58,7 +58,7 @@ int InvertTypes::init(const char *path, const char *file)
         oss << buffer << ": " << prefix << std::endl;
         std::string parser;
         ::snprintf(buffer, sizeof buffer, "invert_%d_parser", i);
-        if (!config.get(buffer, parser))
+        if (length > 0 && !config.get(buffer, parser))
         {
             P_WARNING("failed to get %s", buffer);
             goto FAIL;
@@ -70,13 +70,13 @@ int InvertTypes::init(const char *path, const char *file)
                 || length < 0 || length > 0xFFFF
                 || prefix.length() == 0
                 || prefix.length() >= sizeof(types[i].prefix)
-                || parser.length() == 0)
+                || length > 0 && parser.length() == 0)
         {
             P_WARNING("invalid config for invert[%d]", i);
             goto FAIL;
         }
         std::map<std::string, InvertParser_creater>::iterator it = g_invert_parsers.find(parser);
-        if (it == g_invert_parsers.end())
+        if (length > 0 && it == g_invert_parsers.end())
         {
             WARNING("unsupported invert parser[%s]", parser.c_str());
             goto FAIL;
@@ -84,7 +84,7 @@ int InvertTypes::init(const char *path, const char *file)
         types[type].type = type;
         types[type].payload_len = length;
         ::snprintf(types[type].prefix, sizeof(types[type].prefix), "%s", prefix.c_str());
-        types[type].parser = (*it->second)();
+        types[type].parser = length > 0 ? (*it->second)() : NULL;
     }
     m_meta = oss.str();
     return 0;
