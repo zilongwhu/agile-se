@@ -212,7 +212,7 @@ int ForwardIndex::init(const char *path, const char *file)
             return -1;
         }
         std::ostringstream oss;
-        oss << "field_size: " << field_size << std::endl;
+        oss << "field_size: " << field_size << std::endl << std::endl;
         for (uint32_t i = 0; i < field_size; ++i)
         {
             char tmpbuf[256];
