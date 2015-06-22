@@ -29,7 +29,7 @@ namespace inc
             ret = ret && parseUInt32(conf["partition_cur"].c_str(), _partition_cur);
             ret = ret && parseUInt32(conf["partition_num"].c_str(), _partition_num);
             ret = ret && parseUInt32(conf["base_mode"].c_str(), _base_mode);
-            _inc_name = conf["inc_name"];
+            //_inc_name = conf["inc_name"];
 
             if (!ret)
             {

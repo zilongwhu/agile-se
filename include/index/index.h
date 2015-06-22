@@ -4,6 +4,7 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <pthread.h>
 #include "index/level_index.h"
 #include "inc/inc_reader.h"
 
@@ -44,11 +45,16 @@ class Index
         {
             return m_inc_reader.is_base_mode();
         }
+        void join()
+        {
+            ::pthread_join(m_inc_tid, NULL);
+        }
         int32_t inc_das_warning_time() const
         {
             return m_conf.inc_das_warning_time;
         }
     public:
+        pthread_t m_inc_tid;
         inc::IncReader m_inc_reader;
     private:
         std::vector<LevelIndex *> m_index;

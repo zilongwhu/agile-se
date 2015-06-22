@@ -132,6 +132,7 @@ FAIL:
         while (it != m_level2dirname.end())
         {
             P_WARNING("level[%d]'s dirname: %s", int(it->first), it->second.c_str());
+            ++it;
         }
     }
     if (m_level2dirname.size() == 0)
@@ -141,8 +142,7 @@ FAIL:
     }
     P_WARNING("level num: %u", level_num);
 
-    pthread_t tid;
-    int ret = ::pthread_create(&tid, NULL, proc, this);
+    int ret = ::pthread_create(&m_inc_tid, NULL, proc, this);
     if (ret != 0)
     {
         P_WARNING("failed to create increment_thread, ret=%d", ret);

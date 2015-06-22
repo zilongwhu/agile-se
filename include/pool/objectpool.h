@@ -51,7 +51,7 @@ class TObjectPool
                     P_WARNING("failed to new Pool");
                     return -1;
                 }
-                if (pool->register_item(sizeof(cleanup_bag_t)) < 0)
+                if (m_pool->register_item(sizeof(cleanup_bag_t)) < 0)
                 {
                     P_WARNING("failed to register cleanup_bat_t");
                 }
@@ -77,7 +77,7 @@ class TObjectPool
                 P_WARNING("failed to register cleanup_bat_t");
                 return -1;
             }
-            else if (m_pool->register_item(sizeof(T)) < 0)
+            else if (pool->register_item(sizeof(T)) < 0)
             {
                 P_WARNING("failed to register item");
                 return -1;
