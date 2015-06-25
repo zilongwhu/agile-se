@@ -49,16 +49,26 @@ cJSON *parse_invert_json(const std::string &json, std::vector<invert_data_t> &va
                     json.c_str(), c->string);
             goto FAIL;
         }
-        if (cJSON_Object != c->type)
+        if (cJSON_Object != c->type && cJSON_Array != c->type)
         {
-            P_WARNING("invalid json<%s>, inverts[%d] must be an Object", json.c_str(), (int)type);
+            P_WARNING("invalid json<%s>, inverts[%d] must be an Object or Array", json.c_str(), (int)type);
             goto FAIL;
         }
         for (cJSON *cc = c->child; cc; cc = cc->next)
         {
-            if (!data.set(type, cc))
+            if (cJSON_Object == c->type)
             {
-                goto FAIL;
+                if (!data.set(type, cc))
+                {
+                    goto FAIL;
+                }
+            }
+            else if (cJSON_Array == c->type)
+            {
+                if (!data.set(type, cc->valuestring))
+                {
+                    goto FAIL;
+                }
             }
             values.push_back(data);
         }

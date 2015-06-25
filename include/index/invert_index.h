@@ -50,6 +50,19 @@ struct invert_data_t
         this->value = value;
         return true;
     }
+
+    bool set(int type, const char *key)
+    {
+        if (NULL == key || '\0' == key[0])
+        {
+            P_WARNING("invalid key");
+            return false;
+        }
+        this->type = type;
+        this->key = key;
+        this->value = NULL;
+        return true;
+    }
 };
 cJSON *parse_invert_json(const std::string &json, std::vector<invert_data_t> &values);
 
